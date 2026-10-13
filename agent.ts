@@ -1,7 +1,7 @@
 import OpenAI from "openai";
 import "dotenv/config";
 import { mkdirSync, appendFileSync } from "node:fs";
-import type { ToolArgs, ToolDefinition, ToolCallResult, ChatMessage, TokenUsage } from "./types.js";
+import type { ToolArgs, ToolDefinition, ToolCallResult, ChatMessage, TokenUsage, AgentSession } from "./types.js";
 
 // ========== 日志工具 Todo0-5：INFO / WARN / ERROR 分级 ==========
 const timestamp = (): string => new Date().toISOString();
@@ -103,11 +103,48 @@ const printUsageTotal = (total: TokenUsage): void => {
   logger.info("TOKEN", `累计 prompt: ${total.prompt}, completion: ${total.completion}, total: ${total.total}`);
 };
 
-// 3. 核心 Agent Loop
-async function agentLoop(prompt: string, maxRound: number = config.maxRound) {
-  const messages: ChatMessage[] = [
-    { role: "user", content: prompt },
-  ];
+// ========== 会话管理 Todo1-1：按 sessionId 隔离对话 ==========
+const sessions = new Map<string, AgentSession>();
+
+// 获取或创建会话：同 sessionId 复用历史，新 sessionId 全新隔离
+const getOrCreateSession = (sessionId: string): AgentSession => {
+  let session = sessions.get(sessionId);
+  if (!session) {
+    session = {
+      sessionId,
+      messages: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    sessions.set(sessionId, session);
+    logger.info("SESSION", `创建新会话: ${sessionId}`);
+  }
+  return session;
+};
+
+// 查看会话（只读，便于调试）
+const getSession = (sessionId: string): AgentSession | undefined => sessions.get(sessionId);
+
+// 列出全部会话 ID
+const listSessions = (): string[] => [...sessions.keys()];
+
+// 清空指定会话历史
+const clearSession = (sessionId: string): boolean => sessions.delete(sessionId);
+// =================================================================
+
+// 3. 核心 Agent Loop（会话版：消息挂在 session 上，按 sessionId 隔离）
+async function agentLoop(
+  sessionId: string,
+  prompt: string,
+  maxRound: number = config.maxRound
+): Promise<string> {
+  const session = getOrCreateSession(sessionId);
+  session.messages.push({ role: "user", content: prompt });
+  session.updatedAt = new Date().toISOString();
+  logger.info("SESSION", `会话 ${sessionId} 收到消息，当前历史长度=${session.messages.length}`);
+
+  // 引用会话消息：循环内所有 push 持久化到 session，跨轮共享
+  const messages: ChatMessage[] = session.messages;
 
   // 累计 token 消耗
   let usageTotal: TokenUsage = { prompt: 0, completion: 0, total: 0 };
@@ -158,11 +195,13 @@ async function agentLoop(prompt: string, maxRound: number = config.maxRound) {
       }
 
       messages.push(choice.message);
+      session.updatedAt = new Date().toISOString();
 
       // 没有工具调用，输出最终回答
       if (!choice.message.tool_calls || choice.message.tool_calls.length === 0) {
-        logger.info("AGENT", `最终回答: ${choice.message.content}`);
-        return;
+        const finalAnswer = choice.message.content ?? "";
+        logger.info("AGENT", `最终回答: ${finalAnswer}`);
+        return finalAnswer;
       }
 
       // 遍历所有工具调用
@@ -192,13 +231,25 @@ async function agentLoop(prompt: string, maxRound: number = config.maxRound) {
 
     logger.warn("AGENT", "达到最大轮次限制，Agent 停止");
     printUsageTotal(usageTotal);
+    return "[已停止] 达到最大轮次限制";
   } catch (error) {
     // 全局兜底：未知异常在此终止，不再继续循环
     logger.error("FATAL", "Agent 循环发生未捕获异常，已终止", error);
     printUsageTotal(usageTotal);
+    return "[异常] Agent 循环终止";
   }
 }
 
-// 运行测试
-agentLoop("现在几点了？");
-// agentLoop("请帮我计算 123 + 456");
+export { agentLoop, getOrCreateSession, getSession, listSessions, clearSession };
+
+// Todo1-1 会话隔离验证：A 会话记住名字，B 会话独立不可见
+const main = async (): Promise<void> => {
+  await agentLoop("session-A", "我叫小明，请记住我的名字");
+  await agentLoop("session-A", "我叫什么名字？");
+  await agentLoop("session-B", "我叫什么名字？");
+  logger.info("SESSION", `当前会话列表: ${listSessions().join(", ")}`);
+  const a = getSession("session-A");
+  logger.info("SESSION", `session-A 消息数=${a?.messages.length ?? 0}（应 >0）`);
+};
+
+main();

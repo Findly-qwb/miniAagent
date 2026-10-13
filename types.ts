@@ -41,6 +41,16 @@ export interface ToolCallResult {
 // 对话消息：复用 OpenAI SDK 类型，保证与 /v1/chat/completions 协议一致
 export type ChatMessage = ChatCompletionMessageParam;
 
+// ========== 会话 Todo1-1：按 sessionId 隔离 ==========
+
+// 独立会话：同一 sessionId 共享消息历史，不同 sessionId 互不可见
+export interface AgentSession {
+  sessionId: string;
+  messages: ChatMessage[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ========== Token 统计 ==========
 
 export interface TokenUsage {
