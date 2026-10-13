@@ -4,8 +4,8 @@
   "description": "最小 OpenAI Agent 示例（Function Calling）",
   "type": "module",
   "scripts": {
-    "dev": "tsx agent.ts",
-    "start": "node dist/agent.js",
+    "dev": "tsx src/index.ts",
+    "start": "node dist/index.js",
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },

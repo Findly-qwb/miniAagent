@@ -5,7 +5,7 @@
 ## 项目亮点
 
 - **手写 ReAct 循环**:Model → Think → Act(调工具)→ Observe → Loop,完全理解每一步在做什么
-- **强类型**:全部类型抽离至 `types.ts`,无 `any`;成功/失败统一 `ToolCallResult` 结构回传模型
+- **强类型**:全部类型抽离至 `src/types.ts`,无 `any`;成功/失败统一 `ToolCallResult` 结构回传模型
 - **健壮性**:全局异常兜底 + 可重试策略(限流/超时自动续轮)
 - **可观测**:INFO / WARN / ERROR 分级日志,打印每一轮模型思考、工具名、入参、返回
 - **Token 成本统计**:每轮 + 累计用量,并落盘 `logs/token-usage.log`
@@ -50,7 +50,7 @@ npm run dev
 循环: Model(思考) → 调工具(行动) → 观察结果 → 再思考 → ... → 最终回答
 ```
 
-整个循环由 `agent.ts` 的 `agentLoop()` 驱动,单文件、可读性强,方便逐行讲解。
+整个循环由 `src/agent.ts` 的 `agentLoop()` 驱动,分层模块各司其职、依赖单向,方便逐行讲解。
 
 ## 内置工具
 
@@ -63,8 +63,17 @@ npm run dev
 
 ```
 ts-minimal-agent/
-├── agent.ts        # 核心 Agent 循环 + 工具注册与执行
-├── types.ts        # 全部类型定义(Tool / Message / ToolCallResult / TokenUsage)
+├── src/
+│   ├── index.ts      # 入口:演示用例(会话隔离/上下文压缩验证)
+│   ├── agent.ts      # 核心 Agent 循环(agentLoop)
+│   ├── tools.ts      # 工具注册表 + 执行器(统一 ToolCallResult)
+│   ├── context.ts    # 上下文窗口管理:token 估算 + 超限摘要压缩
+│   ├── session.ts    # 会话管理:按 sessionId 隔离
+│   ├── usage.ts      # Token 统计打印与落盘
+│   ├── llm.ts        # OpenAI 客户端单例
+│   ├── config.ts     # .env 配置读取与校验
+│   ├── logger.ts     # 分级日志(INFO/WARN/ERROR)
+│   └── types.ts      # 全部类型定义(Tool / Message / ToolCallResult / TokenUsage)
 ├── .env.example    # 环境变量模板(提交)
 ├── .env            # 本地密钥(不提交)
 ├── logs/           # Token 消耗日志(不提交)

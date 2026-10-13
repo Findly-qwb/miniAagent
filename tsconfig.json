@@ -17,11 +17,11 @@
     "declaration": false,
     "sourceMap": true,
     "outDir": "dist",
-    "rootDir": ".",
+    "rootDir": "src",
     "noEmitOnError": true
   },
   "include": [
-    "*.ts"
+    "src/**/*.ts"
   ],
   "exclude": [
     "node_modules",
