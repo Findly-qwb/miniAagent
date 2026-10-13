@@ -1,6 +1,7 @@
 import { logger } from "./infra/logger.js";
+import { initMemoryStore, pool } from "./infra/db.js";
 import { agentLoop } from "./core/agent.js";
-import { getSession, listSessions } from "./core/session.js";
+import { clearSession, getSession, listSessions } from "./core/session.js";
 
 export { agentLoop } from "./core/agent.js";
 export { getOrCreateSession, getSession, listSessions, clearSession } from "./core/session.js";
@@ -8,6 +9,9 @@ export { getOrCreateSession, getSession, listSessions, clearSession } from "./co
 // Todo1-1 会话隔离验证：A 会话记住名字，B 会话独立不可见
 // Todo1-2 上下文压缩验证：session-C 投喂长背景资料把估算 token 推过上限，触发自动摘要压缩
 const main = async (): Promise<void> => {
+  // Todo1-5：启动即确保向量库表/索引就绪（幂等），供 save_memory/search_memory 工具使用
+  await initMemoryStore();
+
   await agentLoop("session-A", "我叫小明，请记住我的名字");
   await agentLoop("session-A", "我叫什么名字？");
   await agentLoop("session-B", "我叫什么名字？");
@@ -21,11 +25,21 @@ const main = async (): Promise<void> => {
   await agentLoop("session-C", longContext);
   await agentLoop("session-C", "我刚才提供的背景资料里，公司叫什么名字？主要客户有哪两个？");
 
+  // Todo1-5 长期记忆验证：session-D 让模型自主调 save_memory 落库；
+  // 清空其内存会话（模拟进程重启丢失短期记忆）后，在全新 session-E 提问，
+  // 模型只能靠 search_memory 从 pgvector 召回答案，证明记忆跨会话持久化
+  await agentLoop("session-D", "请记住这个重要事实：我的猫叫秋秋，它是2023年3月3日出生的。保存到长期记忆。");
+  clearSession("session-D");
+  await agentLoop("session-E", "我的猫叫什么名字？它是什么时候出生的？");
+
   logger.info("SESSION", `当前会话列表: ${listSessions().join(", ")}`);
   const a = getSession("session-A");
   logger.info("SESSION", `session-A 消息数=${a?.messages.length ?? 0}（应 >0）`);
   const c = getSession("session-C");
   logger.info("SESSION", `session-C 消息数=${c?.messages.length ?? 0}（压缩后应明显小于长文本原始条数）`);
+
+  // 释放 pg 连接池，否则进程不会退出
+  await pool.end();
 };
 
 main();

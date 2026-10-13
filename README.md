@@ -58,6 +58,8 @@ npm run dev
 |---|---|
 | `get_current_time` | 获取当前本地时间 |
 | `add_numbers` | 计算两个数字相加(含参数校验) |
+| `save_memory` | 把用户事实/对话要点保存到 pgvector 长期记忆库 |
+| `search_memory` | 按语义相似度检索历史记忆(Top-K,余弦距离) |
 
 ## 目录结构
 

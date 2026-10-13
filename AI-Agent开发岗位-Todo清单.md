@@ -35,7 +35,7 @@
 - [x] Todo1-2：实现**上下文窗口管理**：估算消息 token，接近上限时自动摘要压缩旧消息，防止上下文溢出—— ✅ 已完成：`compactContextIfNeeded` 启发式估算 token（字符/2+每条开销 4），超 `MAX_CONTEXT_TOKENS` 时旧消息调模型摘要为 system 消息、保留最近消息（最后一条必保、tool_calls 配对不拆散、摘要失败降级截断）；实测 session-C 投喂 ~1152 tokens 长资料触发压缩 `1271 → 135 tokens`，压缩后仍正确答出「启明科技/华东银行/东方航空」，实际 prompt 2091 → 362，`tsc` 通过
 - [x] Todo1-3：本地启动 PostgreSQL + pgvector（Docker 一键拉起）—— ✅ 已完成（改用免 Docker 方案）：原生安装 PostgreSQL 17（`E:\pgsql17`，服务 `postgresql-x64-17` 运行中）+ 预编译 pgvector 0.8.6（手动分发 dll/control/sql 到 lib、share\extension）；已建库 `miniagent` 并 `CREATE EXTENSION vector`，实测 `[1,2,3] <-> [3,2,1] = 2.828` 向量距离运算正常；连接密码仅存本地，不入库
 - [x] Todo1-4：封装向量库工具：写入记忆、相似度检索记忆—— ✅ 已完成：`src/infra/db.ts`（pg 连接池 + 幂等建 `memories` 表/HNSW 余弦索引）、`src/infra/embedding.ts`（LM Studio nomic-embed 768 维，document/query 前缀；⚠️ 踩坑：SDK 默认 `encoding_format:"base64"` 会让 LM Studio 返回 192 维截断向量，显式 `"float"` 解决）、`src/tools/memory.ts`（`saveMemory`/`searchMemory` 统一 `ToolCallResult`）；实测「银行客户买了什么」Top1=华东银行记忆 0.7585、「航空项目效果」Top1=东方航空 0.6629，语义排序正确
-- [ ] Todo1-5：新增 2 个工具函数：`save_memory`（保存对话摘要到向量库）、`search_memory`（检索历史相关记忆）
+- [x] Todo1-5：新增 2 个工具函数：`save_memory`（保存对话摘要到向量库）、`search_memory`（检索历史相关记忆）—— ✅ 已完成：`tools/index.ts` 注册 2 个工具 schema（描述引导模型何时存/查），`executeTool` 增加 `sessionId` 参数分发到 `saveMemory`/`searchMemory`；实测 session-A 说名字→模型自主 `save_memory` 落库，**全新 session-B 无任何历史**→自主 `search_memory` 召回「小明」；session-D 存猫信息后 `clearSession`，session-E 仅靠 pgvector 答出「秋秋/2023-03-03」；已知短板：nomic 小模型短文本排序偶有 Top1 偏差（猫查询 Top1 是名字记忆，靠 top_k=5 兜住），后续可加相似度阈值或 rerank
 - [ ] Todo1-6：修改 Agent 逻辑：每轮用户提问前，自动检索相关历史记忆，追加到系统 prompt
 - [ ] Todo1-7：测试长对话：多轮对话，验证 Agent 能记住很早之前的内容
 - [ ] Todo1-8：补充 README，新增记忆模块原理说明，提交代码到 GitHub
@@ -118,6 +118,7 @@
 - ✅ **Todo1-2 已完成**：上下文窗口管理——token 估算 + 超限自动摘要压缩，实测压缩 1271→135 tokens 且关键信息可召回
 - ✅ **Todo1-3 已完成**：免 Docker 方案——原生安装 PostgreSQL 17 + pgvector 0.8.6，建库 `miniagent`，`CREATE EXTENSION vector` 与距离运算实测通过
 - ✅ **Todo1-4 已完成**：pg 连接池 + memories 表（HNSW 索引）+ embedding 封装 + `saveMemory`/`searchMemory`，语义检索实测排序正确
-- **进行中 / 下一步**：Todo1-5（新增 Agent 工具 `save_memory`/`search_memory`，注册进工具表供模型调用）
+- ✅ **Todo1-5 已完成**：`save_memory`/`search_memory` 注册为 Function Calling 工具，模型自主调用，跨会话召回实测通过（session-E 靠 pgvector 答出猫名）
+- **进行中 / 下一步**：Todo1-6（每轮提问前自动检索相关记忆注入系统 prompt，不依赖模型主动调工具）
 - ⚠️ 风险项：密钥曾明文出现在 `agent.ts` 源码（历史提交无泄漏，已移至 `.env`），建议尽快轮换曾暴露的 Key
-- 总进度：阶段 0 完成 9/9，阶段 1 进行 4/8
+- 总进度：阶段 0 完成 9/9，阶段 1 进行 5/8

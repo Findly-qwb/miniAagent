@@ -1,3 +1,4 @@
+import { saveMemory, searchMemory } from "./memory.js";
 import type { ToolArgs, ToolDefinition, ToolCallResult } from "../types.js";
 
 // 工具定义（注册表）：新增工具在此追加 schema
@@ -25,10 +26,47 @@ export const tools: ToolDefinition[] = [
       },
     },
   },
+  // Todo1-5：长期记忆工具（pgvector 向量库，见 src/tools/memory.ts）
+  {
+    type: "function",
+    function: {
+      name: "save_memory",
+      description:
+        "把值得长期记住的用户事实或对话要点保存到长期记忆库（向量数据库）。当用户透露个人信息、偏好、重要事实，或明确要求记住某事时调用。",
+      parameters: {
+        type: "object",
+        properties: {
+          content: { type: "string", description: "要保存的记忆内容，应为完整自包含的一句话，如「用户的猫叫秋秋」" },
+        },
+        required: ["content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "search_memory",
+      description:
+        "按语义相似度检索长期记忆库。当回答需要用到历史对话中的信息（如用户之前提过的名字、事实、偏好）而当前对话上下文里没有时调用。",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "检索查询语句，如「用户的猫叫什么名字」" },
+          top_k: { type: "number", description: "返回条数，默认 5" },
+        },
+        required: ["query"],
+      },
+    },
+  },
 ];
 
 // 工具执行器：统一返回 ToolCallResult 结构，成功/失败都序列化为字符串回传模型
-export const executeTool = async (name: string, args: ToolArgs): Promise<ToolCallResult> => {
+// sessionId 用于 save_memory 落库时标记记忆来源会话（Todo1-5）
+export const executeTool = async (
+  name: string,
+  args: ToolArgs,
+  sessionId = "default"
+): Promise<ToolCallResult> => {
   switch (name) {
     case "get_current_time":
       return { ok: true, data: new Date().toLocaleString() };
@@ -39,6 +77,21 @@ export const executeTool = async (name: string, args: ToolArgs): Promise<ToolCal
         return { ok: false, error: `入参必须为数字，实际收到 a=${args.a}, b=${args.b}` };
       }
       return { ok: true, data: `${a} + ${b} = ${a + b}` };
+    }
+    case "save_memory": {
+      const content = String(args.content ?? "").trim();
+      if (!content) {
+        return { ok: false, error: "参数 content 不能为空" };
+      }
+      return saveMemory(sessionId, content);
+    }
+    case "search_memory": {
+      const query = String(args.query ?? "").trim();
+      if (!query) {
+        return { ok: false, error: "参数 query 不能为空" };
+      }
+      const topK = args.top_k ? Number(args.top_k) : 5;
+      return searchMemory(query, Number.isNaN(topK) ? 5 : topK);
     }
     default:
       return { ok: false, error: `未知工具：${name}` };

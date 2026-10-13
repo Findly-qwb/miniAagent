@@ -94,7 +94,7 @@ export async function agentLoop(
           args = {};
         }
         logger.info("TOOL", `工具入参: ${JSON.stringify(args)}`);
-        const toolResult = await executeTool(toolCall.function.name, args);
+        const toolResult = await executeTool(toolCall.function.name, args, sessionId);
         const rendered = toolResult.ok
           ? `[成功] ${toolResult.data}`
           : `[失败] ${toolResult.error}`;
