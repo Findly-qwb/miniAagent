@@ -33,7 +33,7 @@
 
 - [x] Todo1-1：引入会话 ID，不同用户对话独立存储，消息按 sessionId 隔离—— ✅ 已完成：新增 `AgentSession` 类型与内存 `sessions` Map；`agentLoop(sessionId, prompt)` 按会话取历史，导出 `getOrCreateSession/getSession/listSessions/clearSession`；实测 session-A 记住「小明」，session-B 独立问名不可见，隔离生效，`tsc` 通过
 - [x] Todo1-2：实现**上下文窗口管理**：估算消息 token，接近上限时自动摘要压缩旧消息，防止上下文溢出—— ✅ 已完成：`compactContextIfNeeded` 启发式估算 token（字符/2+每条开销 4），超 `MAX_CONTEXT_TOKENS` 时旧消息调模型摘要为 system 消息、保留最近消息（最后一条必保、tool_calls 配对不拆散、摘要失败降级截断）；实测 session-C 投喂 ~1152 tokens 长资料触发压缩 `1271 → 135 tokens`，压缩后仍正确答出「启明科技/华东银行/东方航空」，实际 prompt 2091 → 362，`tsc` 通过
-- [ ] Todo1-3：本地启动 PostgreSQL + pgvector（Docker 一键拉起）
+- [x] Todo1-3：本地启动 PostgreSQL + pgvector（Docker 一键拉起）—— ✅ 已完成（改用免 Docker 方案）：原生安装 PostgreSQL 17（`E:\pgsql17`，服务 `postgresql-x64-17` 运行中）+ 预编译 pgvector 0.8.6（手动分发 dll/control/sql 到 lib、share\extension）；已建库 `miniagent` 并 `CREATE EXTENSION vector`，实测 `[1,2,3] <-> [3,2,1] = 2.828` 向量距离运算正常；连接密码仅存本地，不入库
 - [ ] Todo1-4：封装向量库工具：写入记忆、相似度检索记忆
 - [ ] Todo1-5：新增 2 个工具函数：`save_memory`（保存对话摘要到向量库）、`search_memory`（检索历史相关记忆）
 - [ ] Todo1-6：修改 Agent 逻辑：每轮用户提问前，自动检索相关历史记忆，追加到系统 prompt
@@ -116,6 +116,7 @@
 - ✅ **阶段 0 全部完成（9/9）**：Todo0-1~0-9 均已完成——types.ts 类型抽离、全局异常兜底、Token 落盘、.env 配置抽离、分级日志、git 初始化、README、全流程实测、代码推送 GitHub
 - ✅ **Todo1-1 已完成**：sessionId 会话隔离（内存 Map + AgentSession），跨轮共享历史、跨会话互不可见，已实测
 - ✅ **Todo1-2 已完成**：上下文窗口管理——token 估算 + 超限自动摘要压缩，实测压缩 1271→135 tokens 且关键信息可召回
-- **进行中 / 下一步**：Todo1-3（本地启动 PostgreSQL + pgvector，Docker 一键拉起）
+- ✅ **Todo1-3 已完成**：免 Docker 方案——原生安装 PostgreSQL 17 + pgvector 0.8.6，建库 `miniagent`，`CREATE EXTENSION vector` 与距离运算实测通过
+- **进行中 / 下一步**：Todo1-4（封装向量库工具：写入记忆、相似度检索记忆）
 - ⚠️ 风险项：密钥曾明文出现在 `agent.ts` 源码（历史提交无泄漏，已移至 `.env`），建议尽快轮换曾暴露的 Key
-- 总进度：阶段 0 完成 9/9，阶段 1 进行 2/8
+- 总进度：阶段 0 完成 9/9，阶段 1 进行 3/8
