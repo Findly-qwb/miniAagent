@@ -1,7 +1,7 @@
-import { openai } from "./llm.js";
-import { config } from "./config.js";
-import { logger } from "./logger.js";
-import type { AgentSession, ChatMessage } from "./types.js";
+import { openai } from "../llm/client.js";
+import { config } from "../infra/config.js";
+import { logger } from "../infra/logger.js";
+import type { AgentSession, ChatMessage } from "../types.js";
 
 // ========== 上下文窗口管理 Todo1-2：估算 token + 超限自动摘要压缩 ==========
 // 估算参数：约 2 个字符 ≈ 1 token（中文约 1~2 字符/token、英文约 4，取中间偏中文的启发式，足够做阈值判断）

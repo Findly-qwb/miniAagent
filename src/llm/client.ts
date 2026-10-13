@@ -1,5 +1,5 @@
 import OpenAI from "openai";
-import { config } from "./config.js";
+import { config } from "../infra/config.js";
 
 // OpenAI 客户端单例：全项目共用一个连接配置
 export const openai = new OpenAI({

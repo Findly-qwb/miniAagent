@@ -50,7 +50,7 @@ npm run dev
 循环: Model(思考) → 调工具(行动) → 观察结果 → 再思考 → ... → 最终回答
 ```
 
-整个循环由 `src/agent.ts` 的 `agentLoop()` 驱动,分层模块各司其职、依赖单向,方便逐行讲解。
+整个循环由 `src/core/agent.ts` 的 `agentLoop()` 驱动,分层模块各司其职、依赖单向,方便逐行讲解。
 
 ## 内置工具
 
@@ -64,16 +64,20 @@ npm run dev
 ```
 ts-minimal-agent/
 ├── src/
-│   ├── index.ts      # 入口:演示用例(会话隔离/上下文压缩验证)
-│   ├── agent.ts      # 核心 Agent 循环(agentLoop)
-│   ├── tools.ts      # 工具注册表 + 执行器(统一 ToolCallResult)
-│   ├── context.ts    # 上下文窗口管理:token 估算 + 超限摘要压缩
-│   ├── session.ts    # 会话管理:按 sessionId 隔离
-│   ├── usage.ts      # Token 统计打印与落盘
-│   ├── llm.ts        # OpenAI 客户端单例
-│   ├── config.ts     # .env 配置读取与校验
-│   ├── logger.ts     # 分级日志(INFO/WARN/ERROR)
-│   └── types.ts      # 全部类型定义(Tool / Message / ToolCallResult / TokenUsage)
+│   ├── index.ts          # 入口:演示用例(会话隔离/上下文压缩验证)
+│   ├── types.ts          # 全部类型定义(Tool / Message / ToolCallResult / TokenUsage)
+│   ├── core/             # Agent 核心
+│   │   ├── agent.ts      # 核心 Agent 循环(agentLoop)
+│   │   ├── context.ts    # 上下文窗口管理:token 估算 + 超限摘要压缩
+│   │   └── session.ts    # 会话管理:按 sessionId 隔离
+│   ├── llm/              # 模型层
+│   │   └── client.ts     # OpenAI 客户端单例
+│   ├── tools/            # 工具层
+│   │   └── index.ts      # 工具注册表 + 执行器(统一 ToolCallResult)
+│   └── infra/            # 基础设施
+│       ├── config.ts     # .env 配置读取与校验
+│       ├── logger.ts     # 分级日志(INFO/WARN/ERROR)
+│       └── usage.ts      # Token 统计打印与落盘
 ├── .env.example    # 环境变量模板(提交)
 ├── .env            # 本地密钥(不提交)
 ├── logs/           # Token 消耗日志(不提交)

@@ -16,15 +16,11 @@
 ## 项目结构
 
 - `src/index.ts` — 入口：演示用例，导出公共 API
-- `src/agent.ts` — 核心 Agent 循环（`agentLoop`）
-- `src/tools.ts` — 工具注册表 + 执行器（统一返回 `ToolCallResult`）
-- `src/context.ts` — 上下文窗口管理（token 估算 + 超限摘要压缩）
-- `src/session.ts` — 会话管理（按 sessionId 隔离）
-- `src/usage.ts` — Token 统计打印与落盘
-- `src/llm.ts` — OpenAI 客户端单例
-- `src/config.ts` — `.env` 配置读取与校验
-- `src/logger.ts` — 分级日志
 - `src/types.ts` — 全部类型定义（Tool / Message / ToolCallResult / TokenUsage），禁止 `any`
+- `src/core/` — Agent 核心：`agent.ts`（`agentLoop` 主循环）、`context.ts`（上下文窗口管理）、`session.ts`（会话隔离）
+- `src/llm/` — 模型层：`client.ts`（OpenAI 客户端单例）
+- `src/tools/` — 工具层：`index.ts`（工具注册表 + 执行器，统一返回 `ToolCallResult`）
+- `src/infra/` — 基础设施：`config.ts`（`.env` 读取校验）、`logger.ts`（分级日志）、`usage.ts`（Token 统计落盘）
 - `.env` / `.env.example` — 配置（apiKey、baseURL、modelName、maxRound），密钥只存 `.env`
 - `logs/token-usage.log` — Token 消耗日志（不提交）
 - `README.md` — 项目说明与原理
@@ -42,7 +38,7 @@ npm run build      # 编译到 dist/
 ## 代码约定
 
 - TypeScript 5 · Node.js 20+ · OpenAI SDK v4 · tsx 运行 · ESM（相对导入带 `.js` 后缀）
-- 分层架构：新能力放 `src/` 对应模块，依赖单向（index → agent → context/session/tools/usage → llm/config → logger），禁止反向依赖
+- 分层架构：新能力放 `src/` 对应层，依赖单向（index → core → llm/tools/infra → types/logger），禁止反向依赖
 - 全部类型抽到 `src/types.ts`，工具统一返回 `ToolCallResult`（`{ ok, data?, error? }`）
 - 日志用分级 `logger`（INFO/WARN/ERROR，带时间戳与 tag），禁止裸 `console.log`
 - Agent 循环：外层全局 try/catch 兜底；API 限流/超时可重试（continue），致命错误终止

@@ -1,6 +1,6 @@
 import { mkdirSync, appendFileSync } from "node:fs";
 import { logger } from "./logger.js";
-import type { TokenUsage } from "./types.js";
+import type { TokenUsage } from "../types.js";
 
 // Token 统计打印 + 写入日志文件 Todo0-3
 export const logTokenUsage = (roundUsage: TokenUsage, total: TokenUsage): void => {

@@ -1,11 +1,11 @@
-import { openai } from "./llm.js";
-import { config } from "./config.js";
-import { logger } from "./logger.js";
-import { tools, executeTool } from "./tools.js";
-import { logTokenUsage, printUsageTotal } from "./usage.js";
+import { openai } from "../llm/client.js";
+import { config } from "../infra/config.js";
+import { logger } from "../infra/logger.js";
+import { tools, executeTool } from "../tools/index.js";
+import { logTokenUsage, printUsageTotal } from "../infra/usage.js";
 import { getOrCreateSession } from "./session.js";
 import { compactContextIfNeeded } from "./context.js";
-import type { ChatMessage, ToolArgs, TokenUsage } from "./types.js";
+import type { ChatMessage, ToolArgs, TokenUsage } from "../types.js";
 
 // 核心 Agent Loop（会话版：消息挂在 session 上，按 sessionId 隔离）
 export async function agentLoop(

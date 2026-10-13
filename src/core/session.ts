@@ -1,5 +1,5 @@
-import { logger } from "./logger.js";
-import type { AgentSession } from "./types.js";
+import { logger } from "../infra/logger.js";
+import type { AgentSession } from "../types.js";
 
 // ========== 会话管理 Todo1-1：按 sessionId 隔离对话 ==========
 const sessions = new Map<string, AgentSession>();

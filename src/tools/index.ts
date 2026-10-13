@@ -1,4 +1,4 @@
-import type { ToolArgs, ToolDefinition, ToolCallResult } from "./types.js";
+import type { ToolArgs, ToolDefinition, ToolCallResult } from "../types.js";
 
 // 工具定义（注册表）：新增工具在此追加 schema
 export const tools: ToolDefinition[] = [

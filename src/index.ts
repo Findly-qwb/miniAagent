@@ -1,9 +1,9 @@
-import { logger } from "./logger.js";
-import { agentLoop } from "./agent.js";
-import { getSession, listSessions } from "./session.js";
+import { logger } from "./infra/logger.js";
+import { agentLoop } from "./core/agent.js";
+import { getSession, listSessions } from "./core/session.js";
 
-export { agentLoop } from "./agent.js";
-export { getOrCreateSession, getSession, listSessions, clearSession } from "./session.js";
+export { agentLoop } from "./core/agent.js";
+export { getOrCreateSession, getSession, listSessions, clearSession } from "./core/session.js";
 
 // Todo1-1 会话隔离验证：A 会话记住名字，B 会话独立不可见
 // Todo1-2 上下文压缩验证：session-C 投喂长背景资料把估算 token 推过上限，触发自动摘要压缩
