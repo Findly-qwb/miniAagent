@@ -3,6 +3,19 @@ import "dotenv/config";
 import { mkdirSync, appendFileSync } from "node:fs";
 import type { ToolArgs, ToolDefinition, ToolCallResult, ChatMessage, TokenUsage } from "./types.js";
 
+// ========== 日志工具 Todo0-5：INFO / WARN / ERROR 分级 ==========
+const timestamp = (): string => new Date().toISOString();
+
+const logger = {
+  info: (tag: string, message: string): void =>
+    console.log(`[${timestamp()}] [INFO] [${tag}] ${message}`),
+  warn: (tag: string, message: string): void =>
+    console.warn(`[${timestamp()}] [WARN] [${tag}] ${message}`),
+  error: (tag: string, message: string, detail?: unknown): void =>
+    console.error(`[${timestamp()}] [ERROR] [${tag}] ${message}`, detail ?? ""),
+};
+// ============================================================
+
 // ========== 配置 Todo0-4：从 .env 读取，禁止硬编码密钥 ==========
 const config = {
   apiKey: process.env.OPENAI_API_KEY ?? "",
@@ -12,7 +25,7 @@ const config = {
 };
 
 if (!config.apiKey) {
-  console.error("❌ 缺少 OPENAI_API_KEY，请先复制 .env.example 为 .env 并填入密钥");
+  logger.error("CONFIG", "缺少 OPENAI_API_KEY，请先复制 .env.example 为 .env 并填入密钥");
   process.exit(1);
 }
 // =============================================================
@@ -70,8 +83,9 @@ const executeTool = async (name: string, args: ToolArgs): Promise<ToolCallResult
 
 // Token 统计打印 + 写入日志文件 Todo0-3
 const logTokenUsage = (roundUsage: TokenUsage, total: TokenUsage): void => {
-  console.log(
-    `📊 Token统计 | 本轮 prompt: ${roundUsage.prompt}, completion: ${roundUsage.completion}, total: ${roundUsage.total}`
+  logger.info(
+    "TOKEN",
+    `本轮 prompt: ${roundUsage.prompt}, completion: ${roundUsage.completion}, total: ${roundUsage.total}`
   );
   try {
     mkdirSync("logs", { recursive: true });
@@ -80,15 +94,13 @@ const logTokenUsage = (roundUsage: TokenUsage, total: TokenUsage): void => {
       `${new Date().toISOString()} 本轮 prompt=${roundUsage.prompt} completion=${roundUsage.completion} total=${roundUsage.total} 累计=${total.total}\n`
     );
   } catch (err) {
-    console.error("❌ 写入 token 日志文件失败：", err);
+    logger.error("TOKEN", "写入 token 日志文件失败", err);
   }
 };
 
 // 累计 Token 汇总打印
 const printUsageTotal = (total: TokenUsage): void => {
-  console.log(
-    `\n📈 累计 Token | prompt: ${total.prompt}, completion: ${total.completion}, total: ${total.total}`
-  );
+  logger.info("TOKEN", `累计 prompt: ${total.prompt}, completion: ${total.completion}, total: ${total.total}`);
 };
 
 // 3. 核心 Agent Loop
@@ -103,7 +115,7 @@ async function agentLoop(prompt: string, maxRound: number = config.maxRound) {
   // Todo0-2 全局兜底：包裹整个循环，任何未捕获异常统一终止并打印
   try {
     for (let round = 0; round < maxRound; round++) {
-      console.log(`\n===== 第 ${round + 1} 轮思考 =====`);
+      logger.info("AGENT", `===== 第 ${round + 1} 轮思考 =====`);
       let resp;
       try {
         resp = await openai.chat.completions.create({
@@ -114,7 +126,7 @@ async function agentLoop(prompt: string, maxRound: number = config.maxRound) {
         });
       } catch (error) {
         // 可重试类错误（限流/超时/服务端错误）：注入提示后进入下一轮
-        console.error("❌ 调用模型API失败：", (error as Error).message);
+        logger.error("API", "调用模型失败", error);
         messages.push({ role: "system", content: "模型调用出错，请重试" });
         continue; // 本轮失败，进入下一轮循环，不再访问resp
       }
@@ -140,29 +152,35 @@ async function agentLoop(prompt: string, maxRound: number = config.maxRound) {
       const choice = resp.choices[0];
       if (!choice.message) break;
 
+      // 模型思考/输出内容
+      if (choice.message.content) {
+        logger.info("THINK", `模型输出: ${choice.message.content}`);
+      }
+
       messages.push(choice.message);
 
       // 没有工具调用，输出最终回答
       if (!choice.message.tool_calls || choice.message.tool_calls.length === 0) {
-        console.log("\n✅ 最终回答：", choice.message.content);
+        logger.info("AGENT", `最终回答: ${choice.message.content}`);
         return;
       }
 
       // 遍历所有工具调用
       for (const toolCall of choice.message.tool_calls) {
-        console.log(`🔧 调用工具：${toolCall.function.name}`);
+        logger.info("TOOL", `调用工具: ${toolCall.function.name}`);
         let args: ToolArgs = {};
         try {
           args = JSON.parse(toolCall.function.arguments || "{}");
         } catch (parseErr) {
-          console.error("❌ 解析工具参数JSON失败", parseErr);
+          logger.error("TOOL", `解析工具参数 JSON 失败（工具: ${toolCall.function.name}）`, parseErr);
           args = {};
         }
+        logger.info("TOOL", `工具入参: ${JSON.stringify(args)}`);
         const toolResult = await executeTool(toolCall.function.name, args);
         const rendered = toolResult.ok
           ? `[成功] ${toolResult.data}`
           : `[失败] ${toolResult.error}`;
-        console.log(`📤 工具返回结果：${rendered}`);
+        logger.info("TOOL", `工具返回: ${rendered}`);
 
         messages.push({
           role: "tool",
@@ -172,12 +190,11 @@ async function agentLoop(prompt: string, maxRound: number = config.maxRound) {
       }
     }
 
-    console.log("\n⚠️ 达到最大轮次限制，Agent停止");
+    logger.warn("AGENT", "达到最大轮次限制，Agent 停止");
     printUsageTotal(usageTotal);
   } catch (error) {
     // 全局兜底：未知异常在此终止，不再继续循环
-    console.error("❌ 全局兜底：Agent 循环发生未捕获异常，已终止");
-    console.error(error);
+    logger.error("FATAL", "Agent 循环发生未捕获异常，已终止", error);
     printUsageTotal(usageTotal);
   }
 }

@@ -18,11 +18,11 @@
 - [x] Todo0-2：给 Agent 循环增加**全局 try/catch 异常捕获**：API 报错、网络超时、JSON 解析失败、工具执行异常兜底—— ✅ 已完成：`agentLoop` 外层 try/catch 包裹整个循环作最终兜底，内层区分「可重试(429/超时)→ continue」「致命错误 → 全局终止」；运行中 429/Connection error 均正确捕获不崩溃
 - [x] Todo0-3：增加 Token 统计逻辑，读取返回 `usage`，打印 prompt/completion/total token，简单记录消耗—— ✅ 已完成：每轮累加 `usageTotal`，打印本轮+累计，追加写入 `logs/token-usage.log`
 - [x] Todo0-4：抽离配置（apiKey、baseURL、modelName、maxRound）放到 `.env`，用 `dotenv` 管理，**禁止密钥硬编码**—— ✅ 已完成：密钥已从 `agent.ts` 移除（仅存 `.env`，gitignore 覆盖），配置缺失时启动即报错退出；⚠️ 建议轮换曾出现在源码中的 Key
-- [ ] Todo0-5：优化日志：区分 INFO / WARN / ERROR，清晰打印：轮次、模型思考、工具名称、工具入参、工具返回—— ⬜ 未完成：仍使用 `console.log/error`，无分级logger
-- [ ] Todo0-6：初始化 git 仓库，配置 `.gitignore`（node_modules、.env、日志文件）—— 🔄 部分完成：git 已 `init`（main 分支、0 提交），`.gitignore` 已含 node_modules/dist/*.log/.DS_Store/.env
-- [ ] Todo0-7：编写基础 README.md：项目介绍、运行方式、原理说明（手写 ReAct Agent，Function Calling）—— ⬜ 未完成：无 README.md
-- [ ] Todo0-8：本地运行全流程测试：测试「查时间」「加法计算」两种 case，确认异常场景可正常兜底—— ⬜ 未完成
-- [ ] Todo0-9：提交代码，推送到 GitHub—— ⬜ 未完成：git 0 提交，无 remote
+- [x] Todo0-5：优化日志：区分 INFO / WARN / ERROR，清晰打印：轮次、模型思考、工具名称、工具入参、工具返回—— ✅ 已完成：新增分级 `logger`（时间戳+级别+tag），接通 AGENT/API/THINK/TOOL/TOKEN/FATAL 六类场景，含模型思考与工具入参输出
+- [x] Todo0-6：初始化 git 仓库，配置 `.gitignore`（node_modules、.env、日志文件）—— ✅ 已完成：git 已 init、`.gitignore` 合规（node_modules/dist/*.log/.DS_Store/.env）
+- [x] Todo0-7：编写基础 README.md：项目介绍、运行方式、原理说明（手写 ReAct Agent，Function Calling）—— ✅ 已完成：`README.md` 含亮点、快速开始、ReAct+Function Calling 原理、内置工具、目录结构、命令与路线图
+- [x] Todo0-8：本地运行全流程测试：测试「查时间」「加法计算」两种 case，确认异常场景可正常兜底—— ✅ 已完成：查时间（`[成功] 10/13/2026, 5:08:14 PM`）与加法（`[成功] 123 + 456 = 579`）均跑通；429 限流多轮自动重试后正常收尾，异常兜底/Token 落盘/分级日志全部实测验证
+- [x] Todo0-9：提交代码，推送到 GitHub—— ✅ 已完成：remote 已配置（`git@github.com:Findly-qwb/miniAagent.git`），全部改动（分级日志、README、AGENTS.md、清单更新）已 commit 并 push 至 origin/main
 
 ✅ **阶段 0 交付物**：可稳定运行、规范类型、带 token 统计、密钥环境隔离的原生手写 Agent 仓库，GitHub 仓库就绪。
 
@@ -113,10 +113,7 @@
 ---
 
 ## ✅ 当前进度
-- 已完成：手写原生 ReAct Agent 最小 Demo（Function Calling 版，含查时间、加法工具）
-- ✅ **Todo0-1**（types.ts 类型抽离）、**Todo0-2**（全局异常兜底）、**Todo0-3**（Token 累计+落盘）、**Todo0-4**（.env 配置抽离）已全部完成，`tsc` 通过
-- Todo0-6 已完成 git init + .gitignore（合规），剩 commit/remote 待做
-- 🔄 Todo0-8 部分验证：查时间 case 已跑通（`[成功] ...` 输出）；加法 case 因 API 端 rpm/连接限流暂无法完整验证，待网络恢复重试 `agentLoop("请帮我计算 123 + 456")`
-- **进行中 / 下一步**：GitHub 建仓库后完成 Todo0-9（git remote add + 首次 commit + push）；此前建议先按 Todo0-4 提示轮换密钥
-- ⚠️ 风险项：密钥曾明文出现在 `agent.ts` 源码（git 尚未提交，无历史泄漏），commit 前请轮换新 Key 填入 `.env`
-- 总进度：阶段 0 完成 4/9
+- ✅ **阶段 0 全部完成（9/9）**：Todo0-1~0-9 均已完成——types.ts 类型抽离、全局异常兜底、Token 落盘、.env 配置抽离、分级日志、git 初始化、README、全流程实测、代码推送 GitHub
+- **进行中 / 下一步**：进入阶段 1，从 Todo1-1（会话 ID 隔离）开始
+- ⚠️ 风险项：密钥曾明文出现在 `agent.ts` 源码（历史提交无泄漏，已移至 `.env`），建议尽快轮换曾暴露的 Key
+- 总进度：阶段 0 完成 9/9，阶段 1 待开始
