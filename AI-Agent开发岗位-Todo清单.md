@@ -36,7 +36,7 @@
 - [x] Todo1-3：本地启动 PostgreSQL + pgvector（Docker 一键拉起）—— ✅ 已完成（改用免 Docker 方案）：原生安装 PostgreSQL 17（`E:\pgsql17`，服务 `postgresql-x64-17` 运行中）+ 预编译 pgvector 0.8.6（手动分发 dll/control/sql 到 lib、share\extension）；已建库 `miniagent` 并 `CREATE EXTENSION vector`，实测 `[1,2,3] <-> [3,2,1] = 2.828` 向量距离运算正常；连接密码仅存本地，不入库
 - [x] Todo1-4：封装向量库工具：写入记忆、相似度检索记忆—— ✅ 已完成：`src/infra/db.ts`（pg 连接池 + 幂等建 `memories` 表/HNSW 余弦索引）、`src/infra/embedding.ts`（LM Studio nomic-embed 768 维，document/query 前缀；⚠️ 踩坑：SDK 默认 `encoding_format:"base64"` 会让 LM Studio 返回 192 维截断向量，显式 `"float"` 解决）、`src/tools/memory.ts`（`saveMemory`/`searchMemory` 统一 `ToolCallResult`）；实测「银行客户买了什么」Top1=华东银行记忆 0.7585、「航空项目效果」Top1=东方航空 0.6629，语义排序正确
 - [x] Todo1-5：新增 2 个工具函数：`save_memory`（保存对话摘要到向量库）、`search_memory`（检索历史相关记忆）—— ✅ 已完成：`tools/index.ts` 注册 2 个工具 schema（描述引导模型何时存/查），`executeTool` 增加 `sessionId` 参数分发到 `saveMemory`/`searchMemory`；实测 session-A 说名字→模型自主 `save_memory` 落库，**全新 session-B 无任何历史**→自主 `search_memory` 召回「小明」；session-D 存猫信息后 `clearSession`，session-E 仅靠 pgvector 答出「秋秋/2023-03-03」；已知短板：nomic 小模型短文本排序偶有 Top1 偏差（猫查询 Top1 是名字记忆，靠 top_k=5 兜住），后续可加相似度阈值或 rerank
-- [ ] Todo1-6：修改 Agent 逻辑：每轮用户提问前，自动检索相关历史记忆，追加到系统 prompt
+- [x] Todo1-6：修改 Agent 逻辑：每轮用户提问前，自动检索相关历史记忆，追加到系统 prompt—— ✅ 已完成：`retrieveRelevantMemory`（top_k=3 + 相似度阈值 0.55 过滤噪声，失败降级为不注入不阻塞主循环）；`agentLoop` 发送前生成临时 system 前缀 `[长期记忆]…`，**只注入请求、不落会话历史**（防逐轮堆积）；实测 session-B 零历史问名字，**模型未调任何工具**直接凭注入记忆答出「小明」（prompt 469→564 可见注入开销）；顺手加精确去重（同内容不再重复入库，实测 id=4/6 命中跳过）。已知边界：① 本地 nomic 短查询排序不稳，猫问题 top3 被名字/公司记忆挤占导致一次漏答（待换强 embedding 或 rerank）；② 注入的记忆会诱导模型把「回忆」当「新事实」再次 save（产生改写入库如 id=8/9），可在注入文案里加「勿重复保存」约束
 - [ ] Todo1-7：测试长对话：多轮对话，验证 Agent 能记住很早之前的内容
 - [ ] Todo1-8：补充 README，新增记忆模块原理说明，提交代码到 GitHub
 
@@ -119,6 +119,7 @@
 - ✅ **Todo1-3 已完成**：免 Docker 方案——原生安装 PostgreSQL 17 + pgvector 0.8.6，建库 `miniagent`，`CREATE EXTENSION vector` 与距离运算实测通过
 - ✅ **Todo1-4 已完成**：pg 连接池 + memories 表（HNSW 索引）+ embedding 封装 + `saveMemory`/`searchMemory`，语义检索实测排序正确
 - ✅ **Todo1-5 已完成**：`save_memory`/`search_memory` 注册为 Function Calling 工具，模型自主调用，跨会话召回实测通过（session-E 靠 pgvector 答出猫名）
-- **进行中 / 下一步**：Todo1-6（每轮提问前自动检索相关记忆注入系统 prompt，不依赖模型主动调工具）
+- ✅ **Todo1-6 已完成**：每轮自动检索注入系统 prompt（阈值过滤+失败降级），实测模型不调工具也能凭注入记忆答对；记忆精确去重
+- **进行中 / 下一步**：Todo1-7（长对话测试：多轮对话验证 Agent 记住很早之前的内容）
 - ⚠️ 风险项：密钥曾明文出现在 `agent.ts` 源码（历史提交无泄漏，已移至 `.env`），建议尽快轮换曾暴露的 Key
-- 总进度：阶段 0 完成 9/9，阶段 1 进行 5/8
+- 总进度：阶段 0 完成 9/9，阶段 1 进行 6/8

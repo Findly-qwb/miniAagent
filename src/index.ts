@@ -32,6 +32,10 @@ const main = async (): Promise<void> => {
   clearSession("session-D");
   await agentLoop("session-E", "我的猫叫什么名字？它是什么时候出生的？");
 
+  // Todo1-6 自动检索注入验证：session-G 零历史提问，日志应出现「注入系统 prompt」，
+  // 即使模型本轮不调 search_memory，也能直接凭注入的记忆答出名字
+  await agentLoop("session-G", "你还记得我叫什么名字吗？");
+
   logger.info("SESSION", `当前会话列表: ${listSessions().join(", ")}`);
   const a = getSession("session-A");
   logger.info("SESSION", `session-A 消息数=${a?.messages.length ?? 0}（应 >0）`);

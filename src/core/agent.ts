@@ -2,6 +2,7 @@ import { openai } from "../llm/client.js";
 import { config } from "../infra/config.js";
 import { logger } from "../infra/logger.js";
 import { tools, executeTool } from "../tools/index.js";
+import { retrieveRelevantMemory } from "../tools/memory.js";
 import { logTokenUsage, printUsageTotal } from "../infra/usage.js";
 import { getOrCreateSession } from "./session.js";
 import { compactContextIfNeeded } from "./context.js";
@@ -24,6 +25,10 @@ export async function agentLoop(
   // 引用会话消息：循环内所有 push 持久化到 session，跨轮共享
   const messages: ChatMessage[] = session.messages;
 
+  // Todo1-6：发送前自动检索长期记忆，作为临时 system 前缀注入（不落会话历史，避免逐轮堆积）
+  const memoryDigest = await retrieveRelevantMemory(prompt);
+  const memoryPrefix: ChatMessage[] = memoryDigest ? [{ role: "system", content: memoryDigest }] : [];
+
   // 累计 token 消耗
   let usageTotal: TokenUsage = { prompt: 0, completion: 0, total: 0 };
 
@@ -35,7 +40,7 @@ export async function agentLoop(
       try {
         resp = await openai.chat.completions.create({
           model: config.model,
-          messages,
+          messages: [...memoryPrefix, ...messages],
           tools,
           tool_choice: "auto",
         });
