@@ -9,11 +9,13 @@
 - **健壮性**:全局异常兜底 + 可重试策略(限流/超时自动续轮)
 - **可观测**:INFO / WARN / ERROR 分级日志,打印每一轮模型思考、工具名、入参、返回
 - **Token 成本统计**:每轮 + 累计用量,并落盘 `logs/token-usage.log`
+- **记忆分层**:会话(工作记忆)+ pgvector 长期记忆(语义向量),跨会话持久
+- **上下文窗口管理**:token 估算 + 超限自动摘要压缩,旧消息不丢关键事实
 - **密钥安全**:所有配置走 `.env`(`dotenv`),绝不硬编码
 
 ## 技术栈
 
-TypeScript 5 · Node.js 20+ · OpenAI SDK v4 · tsx(零配置运行)
+TypeScript 5 · Node.js 20+ · OpenAI SDK v4 · tsx(零配置运行) · PostgreSQL 17 + pgvector 0.8
 
 ## 快速开始
 
@@ -36,6 +38,10 @@ npm run dev
 | `OPENAI_BASE_URL` | 兼容 OpenAI 协议的网关地址 | `https://api.openai.com/v1` |
 | `OPENAI_MODEL` | 模型名 | `deepseek-v4-flash` |
 | `MAX_ROUND` | Agent 最大思考轮数 | `3` |
+| `MAX_CONTEXT_TOKENS` | 上下文窗口 token 上限(超限自动摘要压缩) | `1000` |
+| `PG_HOST/PG_PORT/PG_USER/PG_PASSWORD/PG_DATABASE` | PostgreSQL + pgvector 连接(长期记忆库) | `127.0.0.1/5432/postgres/-/miniagent` |
+| `EMBEDDING_MODEL` | 文本向量化模型名 | `text-embedding-nomic-embed-text-v1.5` |
+| `EMBEDDING_DIM` | embedding 向量维度 | `768` |
 
 ## 工作原理(手写 ReAct + Function Calling)
 
@@ -51,6 +57,39 @@ npm run dev
 ```
 
 整个循环由 `src/core/agent.ts` 的 `agentLoop()` 驱动,分层模块各司其职、依赖单向,方便逐行讲解。
+
+## 记忆模块原理(两级记忆)
+
+模拟人类「工作记忆 + 长期记忆」的分层设计:
+
+```
+┌─ 工作记忆(短期) ──────────────────────────────┐
+│ session(内存 Map,按 sessionId 隔离)           │
+│   完整消息流水:user/assistant/tool 逐条       │
+│   超限时自动摘要压缩(旧消息→system 摘要)     │
+│   进程重启即失                                 │
+└──────────────────────────────────────────────┘
+          │ 提炼(模型自主 save_memory / 压缩前联动)
+          ▼
+┌─ 长期记忆(pgvector) ─────────────────────────┐
+│ memories 表:content + embedding vector(768)  │
+│   HNSW 索引 + 余弦距离(<=>)相似度检索         │
+│   进程重启仍在,跨会话可召回                   │
+└──────────────────────────────────────────────┘
+```
+
+**四道记忆通道**:
+
+1. **会话内连贯**(Todo1-1):`session.messages` 跨轮共享,同 ID 复用、异 ID 隔离
+2. **窗口防爆**(Todo1-2):`estimateTokens` 超 `MAX_CONTEXT_TOKENS` 时,旧消息由模型压缩成摘要 system 消息,最近 6 条原样保留(tool_calls 配对不拆散、最后一条必保)
+3. **主动存储**(Todo1-5):`save_memory` / `search_memory` 注册为 Function Calling 工具,模型读到用户个人信息/重要事实时自主落库;同内容精确去重
+4. **被动注入**(Todo1-6):每轮提问前,代码**强制**用当前问题检索 Top-3 相关记忆(相似度≥0.55),拼成 `[长期记忆]` system 前缀注入请求——不依赖模型自觉调工具;检索失败降级为不注入,不阻塞主循环
+
+**关键原理**:
+
+- **向量化**:`embedText` 调用本地 embedding 模型(如 nomic-embed),文本→768 维向量;入库/查询分别加 `search_document:` / `search_query:` 前缀(instruction-tuned 模型的对齐要求)
+- **相似度检索**:pgvector `1 - (embedding <=> $1)` 即余弦相似度(1=完全同向),`ORDER BY 距离 LIMIT K` 取 Top-K,配合 HNSW 索引加速
+- **压缩与记忆的协同**:Todo1-2 压缩旧消息前,关键事实早已通过 Todo1-5/1-6 落库——压缩丢的是"对话现场",长期记忆保住的是"事实",两者互补(9 轮长对话实测:两次压缩后仍完整召回第 1 轮事实)
 
 ## 内置工具
 
@@ -75,11 +114,14 @@ ts-minimal-agent/
 │   ├── llm/              # 模型层
 │   │   └── client.ts     # OpenAI 客户端单例
 │   ├── tools/            # 工具层
-│   │   └── index.ts      # 工具注册表 + 执行器(统一 ToolCallResult)
+│   │   ├── index.ts      # 工具注册表 + 执行器(统一 ToolCallResult)
+│   │   └── memory.ts     # saveMemory/searchMemory/retrieveRelevantMemory
 │   └── infra/            # 基础设施
 │       ├── config.ts     # .env 配置读取与校验
 │       ├── logger.ts     # 分级日志(INFO/WARN/ERROR)
-│       └── usage.ts      # Token 统计打印与落盘
+│       ├── usage.ts      # Token 统计打印与落盘
+│       ├── db.ts         # pg 连接池 + memories 表/HNSW 索引初始化
+│       └── embedding.ts  # 文本→向量(embedText + 前缀对齐)
 ├── .env.example    # 环境变量模板(提交)
 ├── .env            # 本地密钥(不提交)
 ├── logs/           # Token 消耗日志(不提交)
@@ -96,8 +138,8 @@ npm run build      # 编译到 dist/
 
 ## 路线图
 
-- [ ] 上下文窗口管理与会话隔离
-- [ ] 向量记忆(pgvector)
+- [x] 上下文窗口管理与会话隔离
+- [x] 向量记忆(pgvector):save_memory / search_memory + 自动注入
 - [ ] RAG 知识库工具
 - [ ] 多 Agent 编排(手写状态机 + LangGraph 重写)
 - [ ] Web 控制台(Express + React)
