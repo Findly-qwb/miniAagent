@@ -53,7 +53,7 @@
 - [x] Todo2-4：调用 Embedding 接口，生成向量存入 pgvector—— ✅ 已完成：`knowledge_chunks` 表（复用 `embedText` document 前缀 + HNSW 余弦索引），`ingestDocument`/`ingestDirectory` 幂等重灌
 - [x] Todo2-5：实现检索逻辑：相似度查询，返回相关文档片段—— ✅ 已完成：`searchKnowledgeBase`（`1 - (embedding <=> $1)` 余弦相似度 Top-K，返回 docId/docName/chunkIndex/content/similarity）
 - [x] Todo2-6：测试：上传一份业务文档，提问文档内信息，验证 Agent 会主动调用知识库—— ✅ 已完成：`docs/qi-ming-product-manual.md` 产品手册入库（启动幂等重灌），`npm run dev` 实测 Agent 主动调 `search_knowledge_base` 并正确作答
-- [ ] Todo2-7：增加简单评测脚本：统计召回片段、回答幻觉情况
+- [x] Todo2-7：增加简单评测脚本：统计召回片段、回答幻觉情况—— ✅ 已完成：`scripts/eval-rag.ts` + `npm run eval`；7 个预置用例（gold 关键词标注），每例统计「Top1 相似度 / gold 片段是否在 Top3 / 回答是否含 gold 关键词」；实测召回 Top1 命中 6/7、Top3 包含 7/7、回答准确率 5/7。两个失败案例暴露边界：①「核心功能」问题模型自信未调工具按常识编造通用功能（RAG 的"以为知道就不查"问题）；②「版本号」问题模型未调工具且自动记忆注入不覆盖知识库 → 漏答（可后续把 RAG 也纳入每轮强制注入，或调低工具触发门槛）
 - [ ] Todo2-8：更新 README，记录 RAG 流程，提交代码
 
 ✅ **阶段 2 交付物（进行中）**：Agent 具备自主检索知识库能力，RAG 作为工具被 Agent 按需调用（2-1~2-6 已完成）。
@@ -124,6 +124,7 @@
 - ✅ **Todo1-8 已完成**：README 记忆模块原理章节 + 配置表/目录/路线图更新，代码已推送 GitHub
 - ✅ **阶段 1 全部完成（8/8）**：会话隔离 → 上下文压缩 → pgvector 环境 → 向量库封装 → 记忆工具化 → 自动注入 → 长对话验证 → 文档收尾
 - ✅ **Todo2-1~2-6 已完成**：RAG 基础全通——loader/chunker/knowledge（分块重叠+入库+余弦检索）+ `search_knowledge_base` 工具化，实测 Agent 主动检索产品手册并答出准确价格
-- **进行中 / 下一步**：Todo2-7（增加简单评测脚本：统计召回片段、回答幻觉情况）
+- ✅ **Todo2-7 已完成**：评测脚本 `npm run eval`（7 用例），召回 Top3 包含 7/7、回答准确率 5/7，暴露「模型过度自信不查库」边界
+- **进行中 / 下一步**：Todo2-8（更新 README，记录 RAG 流程，提交代码）
 - ⚠️ 风险项：密钥曾明文出现在 `agent.ts` 源码（历史提交无泄漏，已移至 `.env`），建议尽快轮换曾暴露的 Key
-- 总进度：阶段 0 完成 9/9，阶段 1 完成 8/8，阶段 2 进行 6/8
+- 总进度：阶段 0 完成 9/9，阶段 1 完成 8/8，阶段 2 进行 7/8
