@@ -12,6 +12,7 @@
 4. 遇到卡住，直接贴代码，当场解决。
 5. 每一步都对应 JD 能力点，可写入简历与面试讲解。
 6. 禁止将 `.env`、密钥、`node_modules/`、`dist/`、`logs/*.log` 提交入库。
+7. 每个阶段的收尾 Todo（如 1-8/2-8/3-8）必须同步更新 `docs/mvp-vs-production.md`：记录该阶段「MVP 现状 vs 生产做法」差距与踩坑，作为后续优化参照。
 
 ## 项目结构
 
@@ -24,6 +25,7 @@
 - `.env` / `.env.example` — 配置（apiKey、baseURL、modelName、maxRound），密钥只存 `.env`
 - `logs/token-usage.log` — Token 消耗日志（不提交）
 - `README.md` — 项目说明与原理
+- `docs/mvp-vs-production.md` — 各阶段「MVP vs 生产」对照（优化参照系）
 - `AI-Agent开发岗位-Todo清单.md` — 唯一 Todo 真相源
 
 ## 常用命令
