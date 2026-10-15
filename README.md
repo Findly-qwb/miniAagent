@@ -10,7 +10,9 @@
 - **可观测**:INFO / WARN / ERROR 分级日志,打印每一轮模型思考、工具名、入参、返回
 - **Token 成本统计**:每轮 + 累计用量,并落盘 `logs/token-usage.log`
 - **记忆分层**:会话(工作记忆)+ pgvector 长期记忆(语义向量),跨会话持久
+- **RAG 知识库**:文档入库分块 + 向量检索,Agent 自主检索业务资料作答
 - **上下文窗口管理**:token 估算 + 超限自动摘要压缩,旧消息不丢关键事实
+- **可评测**:`npm run eval` 量化召回质量与回答幻觉(定位瓶颈在哪层)
 - **密钥安全**:所有配置走 `.env`(`dotenv`),绝不硬编码
 
 ## 技术栈
@@ -99,6 +101,29 @@ npm run dev
 | `add_numbers` | 计算两个数字相加(含参数校验) |
 | `save_memory` | 把用户事实/对话要点保存到 pgvector 长期记忆库 |
 | `search_memory` | 按语义相似度检索历史记忆(Top-K,余弦距离) |
+| `search_knowledge_base` | 检索已入库的业务文档知识库(产品/价格/流程等,Top-K 分块) |
+
+## RAG 知识库原理
+
+**两段式管道**——离线入库 + 在线检索,全程复用记忆模块的 embedding 基建:
+
+```
+入库: docs/*.md(txt)
+  → loader 读取全文 → chunker 切分块(300字窗口+50字重叠)
+  → embedText("search_document:…") → 768维向量
+  → INSERT knowledge_chunks 表(HNSW 余弦索引,启动幂等重灌)
+
+检索: 用户问「专业版多少钱」
+  → Agent 自主调 search_knowledge_base(query)
+  → embedText("search_query:…") → 查询向量
+  → ORDER BY embedding <=> $1 LIMIT K → 最相关分块(带相似度)
+  → 分块原文回喂模型 → 基于文档作答(数字/事实来自文档,非模型编造)
+```
+
+关键设计:
+- **分块 + 重叠**:块是检索的最小单元,重叠防止语义被窗口边界切断
+- **幂等入库**:同 doc_id 先删后插,`npm run dev` 重复跑不堆积
+- **评测闭环**:`scripts/eval-rag.ts`(7 用例)统计 Top1/Top3 召回与回答命中率,定位瓶颈(召回 or 工具触发)——实测召回 Top3 7/7、回答准确率 5/7,暴露「模型过度自信不调工具」边界
 
 ## 目录结构
 
@@ -116,12 +141,18 @@ ts-minimal-agent/
 │   ├── tools/            # 工具层
 │   │   ├── index.ts      # 工具注册表 + 执行器(统一 ToolCallResult)
 │   │   └── memory.ts     # saveMemory/searchMemory/retrieveRelevantMemory
+│   ├── rag/              # RAG 知识库层
+│   │   ├── loader.ts     # 文档加载(.md/.txt,递归目录)
+│   │   ├── chunker.ts    # 分块(300字窗口+50重叠)
+│   │   └── knowledge.ts  # 入库/检索(knowledge_chunks 表 + 余弦 Top-K)
 │   └── infra/            # 基础设施
 │       ├── config.ts     # .env 配置读取与校验
 │       ├── logger.ts     # 分级日志(INFO/WARN/ERROR)
 │       ├── usage.ts      # Token 统计打印与落盘
-│       ├── db.ts         # pg 连接池 + memories 表/HNSW 索引初始化
+│       ├── db.ts         # pg 连接池 + memories/knowledge 表初始化
 │       └── embedding.ts  # 文本→向量(embedText + 前缀对齐)
+├── scripts/eval-rag.ts  # RAG 评测脚本(召回+幻觉统计)
+├── docs/                # 业务文档(md/txt 入库源)+ mvp-vs-production 对照
 ├── .env.example    # 环境变量模板(提交)
 ├── .env            # 本地密钥(不提交)
 ├── logs/           # Token 消耗日志(不提交)
@@ -134,12 +165,13 @@ ts-minimal-agent/
 npm run dev        # tsx 直接运行
 npm run typecheck  # tsc --noEmit 类型检查
 npm run build      # 编译到 dist/
+npm run eval       # RAG 评测(召回 + 回答幻觉统计)
 ```
 
 ## 路线图
 
 - [x] 上下文窗口管理与会话隔离
 - [x] 向量记忆(pgvector):save_memory / search_memory + 自动注入
-- [ ] RAG 知识库工具
+- [x] RAG 知识库工具(分块入库 + 检索 + 评测)
 - [ ] 多 Agent 编排(手写状态机 + LangGraph 重写)
 - [ ] Web 控制台(Express + React)
