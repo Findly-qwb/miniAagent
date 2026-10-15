@@ -1,4 +1,5 @@
 import { saveMemory, searchMemory } from "./memory.js";
+import { searchKnowledgeBase } from "../rag/knowledge.js";
 import type { ToolArgs, ToolDefinition, ToolCallResult } from "../types.js";
 
 // 工具定义（注册表）：新增工具在此追加 schema
@@ -58,6 +59,23 @@ export const tools: ToolDefinition[] = [
       },
     },
   },
+  // Todo2-1：RAG 知识库工具（业务文档检索，见 src/rag/knowledge.ts）
+  {
+    type: "function",
+    function: {
+      name: "search_knowledge_base",
+      description:
+        "检索已上传的业务文档知识库（如产品手册、操作说明）。当问题涉及产品功能、价格、版本、业务流程等公司业务知识，或用户明确要求查文档时调用。返回最相关的文档片段。",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "检索查询语句，如「专业版价格是多少」" },
+          top_k: { type: "number", description: "返回片段条数，默认 3" },
+        },
+        required: ["query"],
+      },
+    },
+  },
 ];
 
 // 工具执行器：统一返回 ToolCallResult 结构，成功/失败都序列化为字符串回传模型
@@ -92,6 +110,14 @@ export const executeTool = async (
       }
       const topK = args.top_k ? Number(args.top_k) : 5;
       return searchMemory(query, Number.isNaN(topK) ? 5 : topK);
+    }
+    case "search_knowledge_base": {
+      const query = String(args.query ?? "").trim();
+      if (!query) {
+        return { ok: false, error: "参数 query 不能为空" };
+      }
+      const topK = args.top_k ? Number(args.top_k) : 3;
+      return searchKnowledgeBase(query, Number.isNaN(topK) ? 3 : topK);
     }
     default:
       return { ok: false, error: `未知工具：${name}` };

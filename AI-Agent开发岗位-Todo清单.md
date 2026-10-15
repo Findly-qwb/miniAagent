@@ -47,16 +47,16 @@
 ## 📋 阶段 2：RAG 知识库（3~4 天｜JD 核心：RAG 检索、业务知识库）
 **目标**：让 Agent 自主判断是否查询外部文档知识库，而不是只依赖模型内置知识。
 
-- [ ] Todo2-1：新增工具 `search_knowledge_base(query)`，交给 Agent 自主调用
-- [ ] Todo2-2：实现文档加载：支持 Markdown / TXT 文档读取
-- [ ] Todo2-3：实现文本分块 Chunk + 重叠分片逻辑
-- [ ] Todo2-4：调用 Embedding 接口，生成向量存入 pgvector
-- [ ] Todo2-5：实现检索逻辑：相似度查询，返回相关文档片段
-- [ ] Todo2-6：测试：上传一份业务文档，提问文档内信息，验证 Agent 会主动调用知识库
+- [x] Todo2-1：新增工具 `search_knowledge_base(query)`，交给 Agent 自主调用—— ✅ 已完成：注册进 `tools/index.ts`（schema 描述「产品/价格/业务流程等业务知识时调用」），`executeTool` 分发到 `searchKnowledgeBase`；实测 Agent 连调两次（价格、坐席分开检索）后基于文档片段答出「专业版 39,800 元/年、20 坐席、20,000 次/月 AI 会话」，数字全部来自文档无幻觉
+- [x] Todo2-2：实现文档加载：支持 Markdown / TXT 文档读取—— ✅ 已完成：`src/rag/loader.ts`（`loadFile`/`loadDirectory`，递归读目录，支持 .md/.txt，docId=文件名去扩展）
+- [x] Todo2-3：实现文本分块 Chunk + 重叠分片逻辑—— ✅ 已完成：`src/rag/chunker.ts`（`chunkText`，300 字符窗口 + 50 字符重叠，尾部保留；实测手册 3 个分块）
+- [x] Todo2-4：调用 Embedding 接口，生成向量存入 pgvector—— ✅ 已完成：`knowledge_chunks` 表（复用 `embedText` document 前缀 + HNSW 余弦索引），`ingestDocument`/`ingestDirectory` 幂等重灌
+- [x] Todo2-5：实现检索逻辑：相似度查询，返回相关文档片段—— ✅ 已完成：`searchKnowledgeBase`（`1 - (embedding <=> $1)` 余弦相似度 Top-K，返回 docId/docName/chunkIndex/content/similarity）
+- [x] Todo2-6：测试：上传一份业务文档，提问文档内信息，验证 Agent 会主动调用知识库—— ✅ 已完成：`docs/qi-ming-product-manual.md` 产品手册入库（启动幂等重灌），`npm run dev` 实测 Agent 主动调 `search_knowledge_base` 并正确作答
 - [ ] Todo2-7：增加简单评测脚本：统计召回片段、回答幻觉情况
 - [ ] Todo2-8：更新 README，记录 RAG 流程，提交代码
 
-✅ **阶段 2 交付物**：Agent 具备自主检索知识库能力，RAG 作为工具被 Agent 按需调用。
+✅ **阶段 2 交付物（进行中）**：Agent 具备自主检索知识库能力，RAG 作为工具被 Agent 按需调用（2-1~2-6 已完成）。
 
 ---
 
@@ -123,6 +123,7 @@
 - ✅ **Todo1-7 已完成**：9 轮长对话实测，经历两次上下文压缩后仍完整召回第 1 轮的外婆事实（压缩摘要+记忆注入+工具检索三机制协同）
 - ✅ **Todo1-8 已完成**：README 记忆模块原理章节 + 配置表/目录/路线图更新，代码已推送 GitHub
 - ✅ **阶段 1 全部完成（8/8）**：会话隔离 → 上下文压缩 → pgvector 环境 → 向量库封装 → 记忆工具化 → 自动注入 → 长对话验证 → 文档收尾
-- **进行中 / 下一步**：阶段 2（RAG 知识库）——Todo2-1（新增工具 `search_knowledge_base(query)`，交给 Agent 自主调用）
+- ✅ **Todo2-1~2-6 已完成**：RAG 基础全通——loader/chunker/knowledge（分块重叠+入库+余弦检索）+ `search_knowledge_base` 工具化，实测 Agent 主动检索产品手册并答出准确价格
+- **进行中 / 下一步**：Todo2-7（增加简单评测脚本：统计召回片段、回答幻觉情况）
 - ⚠️ 风险项：密钥曾明文出现在 `agent.ts` 源码（历史提交无泄漏，已移至 `.env`），建议尽快轮换曾暴露的 Key
-- 总进度：阶段 0 完成 9/9，阶段 1 完成 8/8
+- 总进度：阶段 0 完成 9/9，阶段 1 完成 8/8，阶段 2 进行 6/8

@@ -2,6 +2,7 @@ import { logger } from "./infra/logger.js";
 import { initMemoryStore, pool } from "./infra/db.js";
 import { agentLoop } from "./core/agent.js";
 import { clearSession, getSession, listSessions } from "./core/session.js";
+import { initKnowledgeStore, ingestDirectory } from "./rag/knowledge.js";
 
 export { agentLoop } from "./core/agent.js";
 export { getOrCreateSession, getSession, listSessions, clearSession } from "./core/session.js";
@@ -11,6 +12,10 @@ export { getOrCreateSession, getSession, listSessions, clearSession } from "./co
 const main = async (): Promise<void> => {
   // Todo1-5：启动即确保向量库表/索引就绪（幂等），供 save_memory/search_memory 工具使用
   await initMemoryStore();
+  // Todo2-1~2-5：初始化知识库表并把 docs/ 下业务文档幂等灌入
+  await initKnowledgeStore();
+  const ingest = await ingestDirectory("docs");
+  logger.info("RAG", `知识库初始化：${ingest.ok ? ingest.data : ingest.error}`);
 
   await agentLoop("session-A", "我叫小明，请记住我的名字");
   await agentLoop("session-A", "我叫什么名字？");
@@ -35,6 +40,9 @@ const main = async (): Promise<void> => {
   // Todo1-6 自动检索注入验证：session-G 零历史提问，日志应出现「注入系统 prompt」，
   // 即使模型本轮不调 search_memory，也能直接凭注入的记忆答出名字
   await agentLoop("session-G", "你还记得我叫什么名字吗？");
+
+  // Todo2-6 知识库自主检索验证：产品问题，模型应主动调 search_knowledge_base 后作答
+  await agentLoop("session-KB", "我们想采购你们的智能客服系统，专业版一年多少钱？支持多少个坐席？");
 
   logger.info("SESSION", `当前会话列表: ${listSessions().join(", ")}`);
   const a = getSession("session-A");
