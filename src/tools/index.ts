@@ -97,6 +97,10 @@ export const tools: ToolDefinition[] = [
   },
 ];
 
+// 按白名单取工具子集（Todo3-3：角色化——Executor 只给执行工具，Planner 不给工具等）
+export const getToolsByNames = (names: string[]): ToolDefinition[] =>
+  tools.filter((t) => names.includes(t.function.name));
+
 // 工具执行器：统一返回 ToolCallResult 结构，成功/失败都序列化为字符串回传模型
 // sessionId 用于 save_memory 落库时标记记忆来源会话（Todo1-5）
 export const executeTool = async (

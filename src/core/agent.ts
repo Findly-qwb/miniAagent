@@ -1,18 +1,25 @@
 import { openai } from "../llm/client.js";
 import { config } from "../infra/config.js";
 import { logger } from "../infra/logger.js";
-import { tools, executeTool } from "../tools/index.js";
+import { tools, executeTool, getToolsByNames } from "../tools/index.js";
 import { retrieveRelevantMemory } from "../tools/memory.js";
 import { logTokenUsage, printUsageTotal } from "../infra/usage.js";
 import { getOrCreateSession } from "./session.js";
 import { compactContextIfNeeded } from "./context.js";
 import type { ChatMessage, ToolArgs, TokenUsage } from "../types.js";
 
+// Todo3-3：角色化运行参数——独立 system prompt + 工具白名单（默认全量、无角色，向后兼容）
+export interface AgentRunOptions {
+  systemPrompt?: string;
+  toolNames?: string[];
+}
+
 // 核心 Agent Loop（会话版：消息挂在 session 上，按 sessionId 隔离）
 export async function agentLoop(
   sessionId: string,
   prompt: string,
-  maxRound: number = config.maxRound
+  maxRound: number = config.maxRound,
+  opts: AgentRunOptions = {}
 ): Promise<string> {
   const session = getOrCreateSession(sessionId);
   session.messages.push({ role: "user", content: prompt });
@@ -27,7 +34,11 @@ export async function agentLoop(
 
   // Todo1-6：发送前自动检索长期记忆，作为临时 system 前缀注入（不落会话历史，避免逐轮堆积）
   const memoryDigest = await retrieveRelevantMemory(prompt);
-  const memoryPrefix: ChatMessage[] = memoryDigest ? [{ role: "system", content: memoryDigest }] : [];
+  // Todo3-3：角色 system prompt 永远置顶，记忆注入紧随其后；工具按角色白名单裁剪
+  const prefix: ChatMessage[] = [];
+  if (opts.systemPrompt) prefix.push({ role: "system", content: opts.systemPrompt });
+  if (memoryDigest) prefix.push({ role: "system", content: memoryDigest });
+  const roleTools = opts.toolNames ? getToolsByNames(opts.toolNames) : tools;
 
   // 累计 token 消耗
   let usageTotal: TokenUsage = { prompt: 0, completion: 0, total: 0 };
@@ -40,8 +51,8 @@ export async function agentLoop(
       try {
         resp = await openai.chat.completions.create({
           model: config.model,
-          messages: [...memoryPrefix, ...messages],
-          tools,
+          messages: [...prefix, ...messages],
+          tools: roleTools,
           tool_choice: "auto",
         });
       } catch (error) {
