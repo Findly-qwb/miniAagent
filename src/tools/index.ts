@@ -84,12 +84,28 @@ export const tools: ToolDefinition[] = [
     function: {
       name: "plan_task",
       description:
-        "把复杂任务拆解为有序、可独立执行的子任务列表（含依赖关系）。当用户提出多步骤复杂需求（如「分析这份文档并输出报告」）时调用，规划结果用于指导后续逐步执行。",
+        "把复杂任务拆解为有序、可独立执行的子任务列表（含依赖关系），只输出计划不执行。当用户只想看任务怎么拆、要执行计划时调用；若用户要求直接交付成品，改用 run_task。",
       parameters: {
         type: "object",
         properties: {
           task: { type: "string", description: "需要拆解的完整任务描述" },
           max_subtasks: { type: "number", description: "子任务数量上限，默认 6" },
+        },
+        required: ["task"],
+      },
+    },
+  },
+  // Todo3-4：多 Agent 流水线工具（规划→执行→校验→交付，见 src/planning/state-machine.ts）
+  {
+    type: "function",
+    function: {
+      name: "run_task",
+      description:
+        "端到端执行复杂多步任务并交付成品：自动完成规划拆解、多角色执行（含知识库检索）、结果校验与返工、最终整合。当用户要求产出一份完整交付物（报告、文档、分析、一页纸介绍等）时调用，比直接回答质量更高但耗时更长。",
+      parameters: {
+        type: "object",
+        properties: {
+          task: { type: "string", description: "完整任务描述，包含所有必须包含的要素" },
         },
         required: ["task"],
       },
@@ -154,6 +170,30 @@ export const executeTool = async (
       } catch (err) {
         logger.error("TOOL", "plan_task 执行失败", err);
         return { ok: false, error: `任务规划失败: ${String(err)}` };
+      }
+    }
+    case "run_task": {
+      const task = String(args.task ?? "").trim();
+      if (!task) {
+        return { ok: false, error: "参数 task 不能为空" };
+      }
+      try {
+        // 动态 import 打破循环依赖：tools → state-machine → roles → agent → tools
+        const { runTask } = await import("../planning/state-machine.js");
+        const report = await runTask(task, sessionId);
+        logger.info("TOOL", `run_task 完成：终态=${report.state}，校验 ${report.reviewRounds} 轮，交付 ${report.finalAnswer.length} 字`);
+        return {
+          ok: true,
+          data: JSON.stringify({
+            state: report.state,
+            reviewRounds: report.reviewRounds,
+            subtasks: report.results.map((r) => ({ id: r.id, title: r.title })),
+            finalAnswer: report.finalAnswer,
+          }),
+        };
+      } catch (err) {
+        logger.error("TOOL", "run_task 执行失败", err);
+        return { ok: false, error: `多角色任务执行失败: ${String(err)}` };
       }
     }
     default:

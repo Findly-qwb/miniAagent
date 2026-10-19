@@ -50,6 +50,13 @@ const main = async (): Promise<void> => {
     "我要给老板做一份启明智能客服系统 vs 竞品的分析报告，这个任务比较复杂，请先用工具把它拆解成可执行的子任务计划。"
   );
 
+  // Todo3-4 多 Agent 协同验证：用户要完整交付物，模型应调 run_task 触发
+  // 规划→执行→校验→交付 全流水线（内部四角色协作），最终拿到成品而非计划
+  await agentLoop(
+    "session-PIPE",
+    "帮我写一份启明智能客服系统的产品一页纸介绍，必须包含产品定位、全部核心功能和三个版本的价格与坐席数，直接给我成品。"
+  );
+
   logger.info("SESSION", `当前会话列表: ${listSessions().join(", ")}`);
   const a = getSession("session-A");
   logger.info("SESSION", `session-A 消息数=${a?.messages.length ?? 0}（应 >0）`);
