@@ -58,3 +58,19 @@ export interface TokenUsage {
   completion: number;
   total: number;
 }
+
+// ========== 任务规划 Todo3-1 ==========
+
+// 单个子任务：plan_task 拆解产物，供状态机（Todo3-2）按依赖执行
+export interface SubTask {
+  id: number;
+  title: string;
+  description: string;
+  dependsOn: number[]; // 前置子任务 id，空数组表示可立即执行
+}
+
+// 完整执行计划
+export interface TaskPlan {
+  task: string; // 原始任务描述
+  subtasks: SubTask[];
+}

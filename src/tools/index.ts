@@ -1,5 +1,7 @@
 import { saveMemory, searchMemory } from "./memory.js";
 import { searchKnowledgeBase } from "../rag/knowledge.js";
+import { planTask } from "../planning/planner.js";
+import { logger } from "../infra/logger.js";
 import type { ToolArgs, ToolDefinition, ToolCallResult } from "../types.js";
 
 // 工具定义（注册表）：新增工具在此追加 schema
@@ -76,6 +78,23 @@ export const tools: ToolDefinition[] = [
       },
     },
   },
+  // Todo3-1：任务规划工具（LLM 拆解子任务，见 src/planning/planner.ts）
+  {
+    type: "function",
+    function: {
+      name: "plan_task",
+      description:
+        "把复杂任务拆解为有序、可独立执行的子任务列表（含依赖关系）。当用户提出多步骤复杂需求（如「分析这份文档并输出报告」）时调用，规划结果用于指导后续逐步执行。",
+      parameters: {
+        type: "object",
+        properties: {
+          task: { type: "string", description: "需要拆解的完整任务描述" },
+          max_subtasks: { type: "number", description: "子任务数量上限，默认 6" },
+        },
+        required: ["task"],
+      },
+    },
+  },
 ];
 
 // 工具执行器：统一返回 ToolCallResult 结构，成功/失败都序列化为字符串回传模型
@@ -118,6 +137,20 @@ export const executeTool = async (
       }
       const topK = args.top_k ? Number(args.top_k) : 3;
       return searchKnowledgeBase(query, Number.isNaN(topK) ? 3 : topK);
+    }
+    case "plan_task": {
+      const task = String(args.task ?? "").trim();
+      if (!task) {
+        return { ok: false, error: "参数 task 不能为空" };
+      }
+      const max = args.max_subtasks ? Number(args.max_subtasks) : 6;
+      try {
+        const plan = await planTask(task, Number.isNaN(max) || max < 1 ? 6 : max);
+        return { ok: true, data: JSON.stringify(plan) };
+      } catch (err) {
+        logger.error("TOOL", "plan_task 执行失败", err);
+        return { ok: false, error: `任务规划失败: ${String(err)}` };
+      }
     }
     default:
       return { ok: false, error: `未知工具：${name}` };

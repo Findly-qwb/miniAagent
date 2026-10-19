@@ -12,9 +12,9 @@ export { getOrCreateSession, getSession, listSessions, clearSession } from "./co
 const main = async (): Promise<void> => {
   // Todo1-5：启动即确保向量库表/索引就绪（幂等），供 save_memory/search_memory 工具使用
   await initMemoryStore();
-  // Todo2-1~2-5：初始化知识库表并把 docs/ 下业务文档幂等灌入
+  // Todo2-1~2-5：初始化知识库表并把业务文档（docs/knowledge/，与项目文档隔离）幂等灌入
   await initKnowledgeStore();
-  const ingest = await ingestDirectory("docs");
+  const ingest = await ingestDirectory("docs/knowledge");
   logger.info("RAG", `知识库初始化：${ingest.ok ? ingest.data : ingest.error}`);
 
   await agentLoop("session-A", "我叫小明，请记住我的名字");
@@ -43,6 +43,12 @@ const main = async (): Promise<void> => {
 
   // Todo2-6 知识库自主检索验证：产品问题，模型应主动调 search_knowledge_base 后作答
   await agentLoop("session-KB", "我们想采购你们的智能客服系统，专业版一年多少钱？支持多少个坐席？");
+
+  // Todo3-1 任务规划验证：复杂多步任务，模型应调 plan_task 输出子任务列表
+  await agentLoop(
+    "session-PLAN",
+    "我要给老板做一份启明智能客服系统 vs 竞品的分析报告，这个任务比较复杂，请先用工具把它拆解成可执行的子任务计划。"
+  );
 
   logger.info("SESSION", `当前会话列表: ${listSessions().join(", ")}`);
   const a = getSession("session-A");

@@ -21,6 +21,8 @@
 - `src/core/` — Agent 核心：`agent.ts`（`agentLoop` 主循环）、`context.ts`（上下文窗口管理）、`session.ts`（会话隔离）
 - `src/llm/` — 模型层：`client.ts`（OpenAI 客户端单例）
 - `src/tools/` — 工具层：`index.ts`（工具注册表 + 执行器，统一返回 `ToolCallResult`）
+- `src/rag/` — RAG 层：`loader.ts`（文档加载）、`chunker.ts`（分块）、`knowledge.ts`（入库/检索）
+- `src/planning/` — 规划层：`planner.ts`（`planTask` LLM 拆解子任务，json_schema 约束）
 - `src/infra/` — 基础设施：`config.ts`（`.env` 读取校验）、`logger.ts`（分级日志）、`usage.ts`（Token 统计落盘）
 - `.env` / `.env.example` — 配置（apiKey、baseURL、modelName、maxRound），密钥只存 `.env`
 - `logs/token-usage.log` — Token 消耗日志（不提交）

@@ -28,7 +28,7 @@ interface EvalRow {
 
 const main = async (): Promise<void> => {
   await initKnowledgeStore();
-  await ingestDirectory("docs");
+  await ingestDirectory("docs/knowledge");
 
   const rows: EvalRow[] = [];
   let recallTop1 = 0;

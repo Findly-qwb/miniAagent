@@ -145,6 +145,8 @@ ts-minimal-agent/
 │   │   ├── loader.ts     # 文档加载(.md/.txt,递归目录)
 │   │   ├── chunker.ts    # 分块(300字窗口+50重叠)
 │   │   └── knowledge.ts  # 入库/检索(knowledge_chunks 表 + 余弦 Top-K)
+│   ├── planning/         # 任务规划层
+│   │   └── planner.ts    # planTask:LLM 拆解子任务(json_schema 约束解码)
 │   └── infra/            # 基础设施
 │       ├── config.ts     # .env 配置读取与校验
 │       ├── logger.ts     # 分级日志(INFO/WARN/ERROR)
@@ -152,7 +154,8 @@ ts-minimal-agent/
 │       ├── db.ts         # pg 连接池 + memories/knowledge 表初始化
 │       └── embedding.ts  # 文本→向量(embedText + 前缀对齐)
 ├── scripts/eval-rag.ts  # RAG 评测脚本(召回+幻觉统计)
-├── docs/                # 业务文档(md/txt 入库源)+ mvp-vs-production 对照
+├── docs/knowledge/      # 业务文档(md/txt 入库源,与项目文档隔离)
+├── docs/                # 项目文档(mvp-vs-production 对照等)
 ├── .env.example    # 环境变量模板(提交)
 ├── .env            # 本地密钥(不提交)
 ├── logs/           # Token 消耗日志(不提交)
