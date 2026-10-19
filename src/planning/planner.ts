@@ -35,7 +35,7 @@ const PLAN_SCHEMA = {
 } as const;
 
 // 从模型输出中提取 JSON：容忍 ```json 围栏与前后废话，取首个 { 到末个 }
-const extractJson = (raw: string): Record<string, unknown> | null => {
+export const extractJson = (raw: string): Record<string, unknown> | null => {
   const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");

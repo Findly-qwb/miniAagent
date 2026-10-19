@@ -64,7 +64,7 @@
 **目标**：先手写简易状态机理解原理；之后迁移 LangGraph TS，不直接跳框架。
 
 - [x] Todo3-1：新增 `plan_task` 工具，复杂任务自动拆分为子任务列表—— ✅ 已完成：`src/planning/planner.ts`（LLM 拆解为 `{id,title,description,dependsOn}` 有序子任务，JSON 容错提取+规整），注册为 `plan_task` 工具；实测 session-PLAN 模型自主调用并输出 6 步执行计划。⚠️ 踩坑：qwen3-4b 自由输出长 JSON 随机停笔致解析失败（非截断，completion 855<1500），LM Studio 不支持 `json_object` 但支持 **`json_schema` 约束解码**，改用 response_format json_schema strict 后连测稳定；顺带修复知识库误吞项目文档（业务文档隔离到 `docs/knowledge/`）
-- [ ] Todo3-2：手写简易状态机，实现：规划 → 执行 → 校验 的流转
+- [x] Todo3-2：手写简易状态机，实现：规划 → 执行 → 校验 的流转—— ✅ 已完成：`src/planning/state-machine.ts`（`runTask`：planning→executing→reviewing→done/failed 四态；按 `dependsOn` 波次推进+环检测兜底；子任务各跑独立 agentLoop 会话、前置结果注入下游 prompt；Reviewer 用 json_schema 校验覆盖度，不达标带 feedback 重跑点名子任务，最多 1 轮）；实测「产品一页纸」任务 6 子任务全部执行、子任务自主查知识库拿到真实价格（39,800/20 席）；校验真实拦截了缺项并触发重试。⚠️ 踩坑：① 子任务不查库编造数据→执行 prompt 加「业务事实必须 search_knowledge_base，严禁编造」修复；② 校验器长 markdown 输入触发约束解码空转（finish=length 空输出）→摘要压缩 200 字+max_tokens 提额+无 schema 兜底；③ 首轮幻觉记忆（"15项功能"）污染后续校验标准——**幻觉入库会长期毒化下游**，生产需加记忆审核/淘汰
 - [ ] Todo3-3：拆分多角色 Agent：Planner（任务拆解）、Executor（工具+RAG 执行）、Reviewer（结果校验与重试判断）
 - [ ] Todo3-4：跑通多 Agent 协同案例（例如文档分析任务）
 - [ ] Todo3-5：学习 LangGraph TS 官方示例，用 LangGraph **重写**这套多 Agent 流程
@@ -128,6 +128,7 @@
 - ✅ **Todo2-8 已完成**：README RAG 原理章节 + 结构/命令/路线图更新，代码已推送 GitHub；mvp-vs-production 已补阶段 2 对照
 - ✅ **阶段 2 全部完成（8/8）**：知识库工具 → 文档加载 → 分块重叠 → 向量入库 → 相似度检索 → 上传实测 → 评测脚本 → 文档收尾
 - ✅ **Todo3-1 已完成**：`plan_task` 工具（json_schema 约束解码根治小模型 JSON 随机停笔），模型自主拆解 6 步计划实测通过
-- **进行中 / 下一步**：Todo3-2（手写简易状态机：规划 → 执行 → 校验 的流转）
+- ✅ **Todo3-2 已完成**：手写状态机 规划→执行→校验→交付，dependsOn 波次调度+校验重试，子任务查库防幻觉；发现幻觉记忆污染问题
+- **进行中 / 下一步**：Todo3-3（拆分多角色 Agent：Planner / Executor / Reviewer）
 - ⚠️ 风险项：密钥曾明文出现在 `agent.ts` 源码（历史提交无泄漏，已移至 `.env`），建议尽快轮换曾暴露的 Key
-- 总进度：阶段 0 完成 9/9，阶段 1 完成 8/8，阶段 2 完成 8/8，阶段 3 进行 1/8
+- 总进度：阶段 0 完成 9/9，阶段 1 完成 8/8，阶段 2 完成 8/8，阶段 3 进行 2/8
