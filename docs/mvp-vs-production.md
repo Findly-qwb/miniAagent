@@ -69,6 +69,22 @@
 
 ---
 
+## 阶段 3：任务规划 + 多 Agent 编排
+
+| 维度 | MVP 现状 | 生产做法 | 差距/优化路径 |
+|---|---|---|---|
+| 规划 | 一次性拆解（planTask），任务转写可能引入幻觉参数（"15项功能"） | 拆解前校验参数与原文一致性；拆解后人工/规则确认再执行 | run_task 参数原文透传或要素校验 |
+| 编排 | 手写 while 状态机 + LangGraph 双实现；串行波次执行 | 并行波次（Promise.all）、动态重规划（执行中发现计划不对可回 Planner） | 就绪集合并发执行；re-plan 环 |
+| 执行 | run_task 同步阻塞整轮对话（实测 4 分钟） | 异步任务队列 + 进度事件流（SSE/WebSocket），断点续跑 | 阶段 4 Web 化时接；LangGraph checkpoint 是现成路径 |
+| 校验 | Reviewer 单模型判断；digest 头尾保留防截断假阴性；失败降级放行 | 校验器与被审者异构模型交叉；要素级 checklist 判分；降级放行需带人工复核标记 | verdict 附证据引用；failed 态触发人审 |
+| 记忆协同 | Executor 白名单禁 save_memory（防幻觉入库，实测已毒化过一次） | 记忆写入带来源与置信度分级，幻觉可标记/回收 | 记忆审核管道 + 淘汰策略 |
+| 资源 | 子会话跑完即 clearSession 回收（3-7 修复） | 会话池 + TTL；多实例下状态外置 Redis/PG | 阶段 4 落库 |
+| 坑 | ① 任务转写幻觉（外层模型改写参数）② Reviewer 约束解码空转（finish=length 空输出）③ 幻觉记忆污染下游（id=20/21 已删）④ redoIds 消费时机 bug（LangGraph reducer merge 让旧产出复活） | — | 全部已记录并修复/缓解 |
+
+**手写 vs LangGraph 实测结论**：≤4 节点固定流程手写更透明（重试环 20 行 vs 框架 3 处配合）；要 checkpoint/流式/人审中断时框架收益反超。详见 README「多 Agent 编排」章节。
+
+---
+
 ## 待补区块（后续阶段）
 
 - 阶段 3：任务规划 + 多 Agent 编排（手写状态机 vs LangGraph）

@@ -93,6 +93,28 @@ npm run dev
 - **相似度检索**:pgvector `1 - (embedding <=> $1)` 即余弦相似度(1=完全同向),`ORDER BY 距离 LIMIT K` 取 Top-K,配合 HNSW 索引加速
 - **压缩与记忆的协同**:Todo1-2 压缩旧消息前,关键事实早已通过 Todo1-5/1-6 落库——压缩丢的是"对话现场",长期记忆保住的是"事实",两者互补(9 轮长对话实测:两次压缩后仍完整召回第 1 轮事实)
 
+## 多 Agent 编排:手写状态机 vs LangGraph
+
+同一套「规划 → 执行 → 校验 → 交付」流水线,项目里保留两个等价实现(`runTask` / `runTaskLangGraph`,同返回结构可互换):
+
+```
+手写版 (state-machine.ts ~140行)          LangGraph版 (langgraph-pipeline.ts ~190行)
+  while 循环 + if 判断推进                    StateGraph 声明节点 + 条件边,图引擎驱动
+  results: Map / done: Set 原地改            Annotation 状态,节点返回增量合并
+  重试 = done.delete + 带 feedback 重跑       重试 = redoIds 状态字段 + 条件边回流
+```
+
+| 维度 | 手写状态机 | LangGraph |
+|---|---|---|
+| 可读性 | 流程一眼看穿,20 行 while 搞定重试 | 简单场景反而啰嗦(状态 reducer+两处条件边) |
+| 状态持久化 | 要自己写落盘 | checkpoint 免费获得(可中断恢复/回放) |
+| 循环安全 | while 条件自己保证 | `recursionLimit` 框架兜底 |
+| 流式进度 | 要自己埋回调 | `graph.stream()` 原生每节点事件 |
+| 依赖/体积 | 零依赖 | +22 包(且绑 LangChain 生态) |
+| 调试 | 断点直接跟 | 状态合并语义要反应堆(reducer 写错=静默 bug) |
+
+**结论**:≤4 节点的固定流水线手写更透明;节点会增长、要断点续跑/人审中断/进度推送时,框架收益反超成本。本项目实测:重试环在 LangGraph 里需要 `redoIds` 字段 + reviewing 计数 + 两条条件边共 3 处配合,手写版一个 `while` 就完事——**框架不是银弹,是另一种权衡**。
+
 ## 内置工具
 
 | 工具 | 说明 |
@@ -102,6 +124,8 @@ npm run dev
 | `save_memory` | 把用户事实/对话要点保存到 pgvector 长期记忆库 |
 | `search_memory` | 按语义相似度检索历史记忆(Top-K,余弦距离) |
 | `search_knowledge_base` | 检索已入库的业务文档知识库(产品/价格/流程等,Top-K 分块) |
+| `plan_task` | 复杂任务拆解为带依赖的子任务列表(只出计划不执行) |
+| `run_task` | 端到端多 Agent 流水线:规划→执行→校验→交付,产出完整成品 |
 
 ## RAG 知识库原理
 
@@ -145,8 +169,11 @@ ts-minimal-agent/
 │   │   ├── loader.ts     # 文档加载(.md/.txt,递归目录)
 │   │   ├── chunker.ts    # 分块(300字窗口+50重叠)
 │   │   └── knowledge.ts  # 入库/检索(knowledge_chunks 表 + 余弦 Top-K)
-│   ├── planning/         # 任务规划层
-│   │   └── planner.ts    # planTask:LLM 拆解子任务(json_schema 约束解码)
+│   ├── planning/         # 任务规划与多 Agent 编排层
+│   │   ├── planner.ts    # planTask:LLM 拆解子任务(json_schema 约束解码)
+│   │   ├── roles.ts      # Planner/Executor/Reviewer/Synthesizer 四角色(人设+工具白名单)
+│   │   ├── state-machine.ts     # 手写状态机 runTask(规划→执行→校验→交付)
+│   │   └── langgraph-pipeline.ts # LangGraph 等价实现 runTaskLangGraph
 │   └── infra/            # 基础设施
 │       ├── config.ts     # .env 配置读取与校验
 │       ├── logger.ts     # 分级日志(INFO/WARN/ERROR)
@@ -176,5 +203,5 @@ npm run eval       # RAG 评测(召回 + 回答幻觉统计)
 - [x] 上下文窗口管理与会话隔离
 - [x] 向量记忆(pgvector):save_memory / search_memory + 自动注入
 - [x] RAG 知识库工具(分块入库 + 检索 + 评测)
-- [ ] 多 Agent 编排(手写状态机 + LangGraph 重写)
+- [x] 多 Agent 编排(手写状态机 + LangGraph 重写)
 - [ ] Web 控制台(Express + React)

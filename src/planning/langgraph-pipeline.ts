@@ -1,5 +1,6 @@
 import { StateGraph, START, END, Annotation } from "@langchain/langgraph";
 import { logger } from "../infra/logger.js";
+import { clearSession } from "../core/session.js";
 import {
   plannerAgent,
   executorAgent,
@@ -161,6 +162,9 @@ export const runTaskLangGraph = async (
   );
   const state: "done" | "failed" = final.verdict?.passed ? "done" : "failed";
   logger.info("LG", `[完成] 终态=${state}，校验 ${final.reviewRounds} 轮，交付 ${final.finalAnswer.length} 字`);
+  // 回收流水线子会话（与手写版一致，防内存堆积）
+  for (const st of final.subtasks) clearSession(`${sessionId}-sub-${st.id}`);
+  clearSession(`${sessionId}-final`);
   return {
     task,
     state,

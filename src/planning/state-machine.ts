@@ -1,4 +1,5 @@
 import { logger } from "../infra/logger.js";
+import { clearSession } from "../core/session.js";
 import {
   plannerAgent,
   executorAgent,
@@ -97,6 +98,11 @@ export const runTask = async (
   );
   const state: TaskState = verdict.passed ? "done" : "failed";
   logger.info("SM", `[reviewing → ${state}] 校验轮次 ${rounds}，交付 ${finalAnswer.length} 字`);
+
+  // Todo3-7：回收流水线子会话（sub-1..N/final），防内存 Map 随任务数无限堆积；
+  // 子会话只是执行容器，结果已在 results/finalAnswer 中，删之无损
+  for (const st of plan.subtasks) clearSession(`${sessionId}-sub-${st.id}`);
+  clearSession(`${sessionId}-final`);
 
   return { task, state, results: toList(), reviewRounds: rounds, finalAnswer };
 };

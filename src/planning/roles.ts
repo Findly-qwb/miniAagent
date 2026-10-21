@@ -91,9 +91,14 @@ export const reviewerAgent = async (
   results: SubTaskResult[]
 ): Promise<ReviewVerdict> => {
   logger.info("ROLE", "[Reviewer] 校验产出覆盖度");
-  // 摘要压缩到每结果 200 字：长 markdown 易触发约束解码空转（实测 finish=length 空输出）
+  // 摘要：压掉空白后保留头 200 字 + 尾 100 字——定长截 200 会把尾部要素（如旗舰版价格）切掉，
+  // 导致 Reviewer 假阴性判缺（Todo3-3 实测踩坑）；头尾保留兼顾约束解码稳定性与信息完整
   const digest = results
-    .map((r) => `#${r.id} ${r.title}：${r.result.replace(/\s+/g, " ").slice(0, 200)}`)
+    .map((r) => {
+      const flat = r.result.replace(/\s+/g, " ");
+      const brief = flat.length <= 300 ? flat : `${flat.slice(0, 200)}…(中略)…${flat.slice(-100)}`;
+      return `#${r.id} ${r.title}：${brief}`;
+    })
     .join("\n");
   const messages = [
     { role: "system" as const, content: REVIEW_SYSTEM },
