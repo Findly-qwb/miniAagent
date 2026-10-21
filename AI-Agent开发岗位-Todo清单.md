@@ -67,7 +67,7 @@
 - [x] Todo3-2：手写简易状态机，实现：规划 → 执行 → 校验 的流转—— ✅ 已完成：`src/planning/state-machine.ts`（`runTask`：planning→executing→reviewing→done/failed 四态；按 `dependsOn` 波次推进+环检测兜底；子任务各跑独立 agentLoop 会话、前置结果注入下游 prompt；Reviewer 用 json_schema 校验覆盖度，不达标带 feedback 重跑点名子任务，最多 1 轮）；实测「产品一页纸」任务 6 子任务全部执行、子任务自主查知识库拿到真实价格（39,800/20 席）；校验真实拦截了缺项并触发重试。⚠️ 踩坑：① 子任务不查库编造数据→执行 prompt 加「业务事实必须 search_knowledge_base，严禁编造」修复；② 校验器长 markdown 输入触发约束解码空转（finish=length 空输出）→摘要压缩 200 字+max_tokens 提额+无 schema 兜底；③ 首轮幻觉记忆（"15项功能"）污染后续校验标准——**幻觉入库会长期毒化下游**，生产需加记忆审核/淘汰
 - [x] Todo3-3：拆分多角色 Agent：Planner（任务拆解）、Executor（工具+RAG 执行）、Reviewer（结果校验与重试判断）—— ✅ 已完成：`src/planning/roles.ts` 四角色（Planner=拆解；Executor=`agentLoop`+独立 system prompt+工具白名单 `[time,add,search_knowledge_base,search_memory]`（**不给 plan_task 防递归规划、不给 save_memory 防幻觉入库**）；Reviewer=无工具纯判断，json_schema 输出 `{passed,incompleteIds,feedback}`+三级降级；Synthesizer=只读 RAG 整合交付）；`core/agent.ts` 扩展 `AgentRunOptions{systemPrompt,toolNames}` 向后兼容（默认全量工具无角色），`tools/index.ts` 加 `getToolsByNames`；状态机改为纯编排角色。实测四角色日志轨迹清晰、Executor 全程查库拿真实价格、Reviewer 点名 #3/#5 触发定向返工。⚠️ 新发现：Reviewer digest 每条截 200 字导致「旗舰版价格」被截掉→假阴性判不过（交付其实完整），截断防空转 vs 信息保全是矛盾，Todo3-7 优化（改按要素抽取而非定长截断）
 - [x] Todo3-4：跑通多 Agent 协同案例（例如文档分析任务）—— ✅ 已完成：注册 `run_task` 工具（描述区分：只要计划→plan_task，要成品→run_task），`executeTool` 动态 `import(state-machine.js)` 打破 tools→SM→roles→agent→tools 循环依赖；实测聊天入口「写产品一页纸，直接给我成品」→ 模型自主调 `run_task` → 四角色流水线（Planner 拆 6 步 → 6 个独立子会话 Executor 执行 → Reviewer → Synthesizer 交付 707 字）→ 成品回喂聊天模型输出给用户，**对话→编排全链路贯通**。⚠️ 实测暴露两问题（3-7 优化）：① 任务改写幻觉——外层模型把任务参数改写成「15项核心功能」（手册实际只有 4 项），Executor 顺从编出 15 项通用功能，garbage-in-garbage-out；② Reviewer 本轮两次 finish=length 降级放行（rounds=0 直接 done），幻觉内容未被拦截；③ 子会话（sub-1..6/final）留在内存 Map 不清理，长任务会堆积
-- [ ] Todo3-5：学习 LangGraph TS 官方示例，用 LangGraph **重写**这套多 Agent 流程
+- [x] Todo3-5：学习 LangGraph TS 官方示例，用 LangGraph **重写**这套多 Agent 流程—— ✅ 已完成：`src/planning/langgraph-pipeline.ts`（`runTaskLangGraph`，与手写版同名同返回结构可无缝替换）：`Annotation.Root` 声明图状态（results/done/redoIds/verdict 各带 reducer），4 节点（planning/executing/reviewing/synthesizing）复用 roles.ts 四角色，`addConditionalEdges` 实现 executing↔reviewing 返工环，`recursionLimit` 防死循环；实测端到端跑通（6 子任务+1 轮校验返工+交付 608 字），与手写版行为等价。⚠️ 对比发现：① LangGraph 的状态是"每节点返回增量合并"，手写版是"Map/Set 原地改"——前者可回放/持久化（checkpoint 免费获得），后者直观但要自己实现落盘；② 重试环手写版 20 行 while 就够，LangGraph 要 redoIds 状态字段+条件边两处配合，简单场景反而更啰嗦；③ 本轮实测再次复现"15项功能"任务改写幻觉（来自记忆 id=20/21 污染残留，已删）——与编排层无关，是 Planner 输入被历史污染的例证
 - [ ] Todo3-6：对比手写状态机 vs LangGraph，记录两者差异，写进 README
 - [ ] Todo3-7：测试多轮复杂任务，验证任务重试、分支跳转逻辑
 - [ ] Todo3-8：提交代码，更新文档
@@ -131,6 +131,7 @@
 - ✅ **Todo3-2 已完成**：手写状态机 规划→执行→校验→交付，dependsOn 波次调度+校验重试，子任务查库防幻觉；发现幻觉记忆污染问题
 - ✅ **Todo3-3 已完成**：Planner/Executor/Reviewer/Synthesizer 四角色拆分（各自 system prompt + 工具白名单），状态机变纯编排层；发现 Reviewer 截断假阴性
 - ✅ **Todo3-4 已完成**：`run_task` 工具接入对话链路（动态 import 破循环依赖），聊天一句话触发四角色流水线拿成品；暴露任务改写幻觉+Reviewer 降级放行两问题
-- **进行中 / 下一步**：Todo3-5（学习 LangGraph TS 官方示例，用它重写多 Agent 流程）
+- ✅ **Todo3-5 已完成**：LangGraph 重写流水线（Annotation 状态+4 节点+条件边返工环），端到端与手写版等价；积累"手写 vs 框架"对比素材
+- **进行中 / 下一步**：Todo3-6（对比手写状态机 vs LangGraph，差异写进 README）
 - ⚠️ 风险项：密钥曾明文出现在 `agent.ts` 源码（历史提交无泄漏，已移至 `.env`），建议尽快轮换曾暴露的 Key
-- 总进度：阶段 0 完成 9/9，阶段 1 完成 8/8，阶段 2 完成 8/8，阶段 3 进行 4/8
+- 总进度：阶段 0 完成 9/9，阶段 1 完成 8/8，阶段 2 完成 8/8，阶段 3 进行 5/8
