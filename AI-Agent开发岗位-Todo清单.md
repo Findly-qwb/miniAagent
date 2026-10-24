@@ -79,7 +79,7 @@
 ## 📋 阶段 4：全栈 Web 服务 + 前端控制台（3~5 天｜JD：需求 → 原型 → 上线 → 迭代闭环）
 **目标**：做成完整 0-1 全栈 Web 应用，前后端打通，可浏览器交互。
 
-- [ ] Todo4-1：基于 Nest.js / Express，封装 Agent 能力，暴露 HTTP 接口
+- [x] Todo4-1：基于 Nest.js / Express，封装 Agent 能力，暴露 HTTP 接口—— ✅ 已完成：`src/server/`（app 装配 + routes）；`logger.ts` 改造为「console + 事件总线」双通道并接入 `AsyncLocalStorage` 请求上下文（跨 await 链给每条日志打 reqId）；接口：`GET /api/health`、`GET /api/sessions`、`DELETE /api/sessions/:id`、`POST /api/chat`（**SSE 流式**：思考链路 log 事件按 reqId 过滤推送，长任务不阻塞 HTTP）、`POST /api/knowledge/upload`（落盘+分块入库，防路径穿越）、`GET /api/knowledge/docs`；实测 SSE 三类事件（log/result/done）齐全、多请求 reqId 隔离；**意外验证降级链**：embedding 模型未加载时 chat 仍成功（retrieveRelevantMemory catch→null 静默降级）
 - [ ] Todo4-2：React 前端页面开发：对话输入框、展示 Agent 思考链路与工具调用日志、知识库文档上传入口、会话切换
 - [ ] Todo4-3：前后端联调，浏览器端完整跑通对话、知识库上传
 - [ ] Todo4-4：Docker 打包整个项目（后端 + 数据库），编写 Dockerfile、docker-compose.yml
@@ -136,6 +136,7 @@
 - ✅ **Todo3-7 已完成**：重试环（点名返工+轮次耗尽转 failed）与直通分支（rounds=0 done）双任务实测通过；修复子会话泄漏+Reviewer 截断假阴性两笔挂账
 - ✅ **Todo3-8 已完成**：README 编排章节 + mvp-vs-production 阶段 3 对照，代码已提交
 - ✅ **阶段 3 全部完成（8/8）**：plan_task → 状态机 → 四角色 → run_task 接入对话 → LangGraph 重写 → 对比 → 重试/分支测试 → 文档收尾
-- **进行中 / 下一步**：阶段 4（Web 服务 + 前端控制台）——Todo4-1（Express 提供 /chat 接口，sessionId 隔离多用户）
+- ✅ **Todo4-1 已完成**：Express + SSE 流式接口（/api/chat 思考链路按 reqId 隔离推送）、知识库上传/列表、会话管理；logger 双通道改造 + AsyncLocalStorage
+- **进行中 / 下一步**：Todo4-2（React 前端：对话输入、思考链路展示、文档上传、会话切换）
 - ⚠️ 风险项：密钥曾明文出现在 `agent.ts` 源码（历史提交无泄漏，已移至 `.env`），建议尽快轮换曾暴露的 Key
-- 总进度：阶段 0 完成 9/9，阶段 1 完成 8/8，阶段 2 完成 8/8，阶段 3 完成 8/8
+- 总进度：阶段 0 完成 9/9，阶段 1 完成 8/8，阶段 2 完成 8/8，阶段 3 完成 8/8，阶段 4 进行 1/7
