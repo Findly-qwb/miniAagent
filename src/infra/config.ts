@@ -18,6 +18,9 @@ export const config = {
   },
   embeddingModel: process.env.EMBEDDING_MODEL ?? "text-embedding-nomic-embed-text-v1.5",
   embeddingDim: Number(process.env.EMBEDDING_DIM ?? "768"),
+  // chat 与 embedding 常分开部署（如 chat 走云 API、embedding 走本地 LM Studio），独立端点
+  embeddingBaseURL: process.env.EMBEDDING_BASE_URL ?? (process.env.OPENAI_BASE_URL ?? "https://api.openai.com/v1"),
+  embeddingApiKey: process.env.EMBEDDING_API_KEY ?? (process.env.OPENAI_API_KEY ?? ""),
 };
 
 if (!config.apiKey) {

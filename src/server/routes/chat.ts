@@ -48,7 +48,9 @@ chatRouter.post("/chat", (req, res) => {
   const cleanup = (): void => {
     logEmitter.off("log", onLog);
   };
-  req.on("close", cleanup); // 客户端断开即退订
+  // 监听响应连接关闭（客户端断开），而非 req 的 close——POST body 读完 req 就 close，
+  // 误用 req 会在 agentLoop 刚起步时就移除 listener，导致后续日志丢失（实测踩坑）
+  res.on("close", cleanup);
 
   // AsyncLocalStorage：agentLoop 调用链内所有 logger 输出自动携带 reqId
   void requestContext.run({ reqId }, async () => {
