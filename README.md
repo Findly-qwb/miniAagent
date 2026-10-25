@@ -202,11 +202,13 @@ ts-minimal-agent/
 
 ```bash
 npm run dev        # tsx 直接运行(演示用例:会话隔离/压缩/记忆/规划全流程)
-npm run server     # 启动 HTTP 服务(开发模式,tsx)
+npm run dev:all    # 一键拉起前后端(server:3000 + web:5173,Ctrl+C 全停)
+npm run server     # 仅启动 HTTP 服务(开发模式,tsx)
 npm run typecheck  # tsc --noEmit 类型检查
 npm run build      # 编译后端到 dist/
 npm run eval       # RAG 评测(召回 + 回答幻觉统计)
-cd web && npm install && npm run dev   # 前端控制台(默认 5173,/api 代理到 3000)
+npm run web:dev    # 仅前端控制台(5173,/api 代理到 3000)
+npm run web:build  # 前端打包到 web/dist
 ```
 
 ## 部署

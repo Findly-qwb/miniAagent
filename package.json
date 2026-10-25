@@ -5,7 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx src/index.ts",
+    "dev:all": "node scripts/dev-all.mjs",
     "server": "tsx src/server/index.ts",
+    "web:dev": "npm --prefix web run dev",
+    "web:build": "npm --prefix web run build",
     "start": "node dist/server/index.js",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
