@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "server": "tsx src/server/index.ts",
-    "start": "node dist/index.js",
+    "start": "node dist/server/index.js",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "eval": "tsx scripts/eval-rag.ts"

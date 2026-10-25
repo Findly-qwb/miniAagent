@@ -1,0 +1,11 @@
+node_modules
+web/node_modules
+dist
+web/dist
+web/tsconfig.tsbuildinfo
+logs
+*.log
+.env
+.git
+index.html
+pelican-cycle.html
