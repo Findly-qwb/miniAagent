@@ -97,7 +97,7 @@
 - [ ] Todo5-1：MCP：改造工具调用，对接 MCP 服务，理解 Model Context Protocol
 - [ ] Todo5-2：Ollama 本地部署 LLM，Agent 对接本地模型
 - [ ] Todo5-3：Graph RAG 改造知识库，构建知识图谱增强检索
-- [ ] Todo5-4：Agent 评测脚本：批量评测任务，统计成功率、幻觉率、token 成本
+- [x] Todo5-4：Agent 评测脚本：批量评测任务，统计成功率、幻觉率、token 成本—— ✅ 已完成：`scripts/eval-agent.ts`（`npm run eval:agent`）：8 用例覆盖 5 类能力（tool/memory/rag/plan/anti-hallucination），gold 关键词判分 + forbidden 关键词判幻觉 + `onUsage` 回调精确统计每用例 token；**评测当场抓出真 bug**：① 无关文档混入 docs/knowledge 污染检索（移出+清库）② 云端 429 限流下固定 3s 退避不足、重试烧光轮次预算 → 修 `agentLoop` 指数退避（8s 起、×2、上限 30s、最多 3 次、**退避重试不占轮次**）；修复后成功率 37.5% → **100%、幻觉率 0%**（含"月球基地收费"诱骗题正确拒答）
 - [ ] Todo5-5：CI/CD 配置，代码提交自动运行简单测试
 
 ---
@@ -144,6 +144,7 @@
 - ✅ **Todo4-7 已完成**：README 部署章节（Docker + 本地生产模式双路径）+ 目录/技术栈/命令/路线图更新，mvp-vs-production 阶段 4 对照
 - ⏸ **Todo4-5 环境受限跳过**：本机未开 BIOS 虚拟化，用户决定不用 Docker 部署；compose 交付物已就绪，本地生产模式已做等价验证
 - ✅ **阶段 4 完成（6/7，4-5 环境受限）**：HTTP 接口 → React 控制台 → 端到端联调 → Docker 打包 → 监控 → 部署文档
-- **进行中 / 下一步**：阶段 5 加分项（选做 1~2 个）——Todo5-4（Agent 批量评测：成功率/幻觉率/token 成本）最贴合已建的 eval-rag 体系，推荐优先
+- ✅ **Todo5-4 已完成**：Agent 批量评测（8 用例 5 类能力，成功率 100%/幻觉 0%/平均 3414 tok）；评测抓出 429 退避不足与知识库污染两个真 bug 并修复
+- **进行中 / 下一步**：Todo5-5（CI/CD：GitHub Actions 自动跑 typecheck + 评测回归）
 - ⚠️ 风险项：密钥曾明文出现在 `agent.ts` 源码（历史提交无泄漏，已移至 `.env`），建议尽快轮换曾暴露的 Key
-- 总进度：阶段 0 完成 9/9，阶段 1 完成 8/8，阶段 2 完成 8/8，阶段 3 完成 8/8，阶段 4 完成 6/7（4-5 环境受限）
+- 总进度：阶段 0~4 全部完成（9+8+8+8+6），阶段 5 进行 1/5
