@@ -85,6 +85,21 @@
 
 ---
 
+## 阶段 4：Web 服务 + 前端控制台
+
+| 维度 | MVP 现状 | 生产做法 | 差距/优化路径 |
+|---|---|---|---|
+| 会话存储 | 进程内存 Map，重启即丢 | PG/Redis 持久化 sessions/messages，多实例共享 | 阶段 5 或迭代：会话落库 + TTL |
+| 对话传输 | SSE 流式（手写 fetch 解析） | SSE/WebSocket；断线重连 + 事件序号续传 | 加 Last-Event-ID 重放 |
+| 长任务 | run_task 同步阻塞整轮 HTTP（实测 4 分钟） | 异步任务队列 + 进度事件 + 断点续跑 | LangGraph checkpoint 是现成路径 |
+| 鉴权 | 无（任何人可访问） | JWT/API Key + 会话归属校验 + 限流 | 上线前必须补 |
+| 监控 | 内存计数（耗时/成功率），进程重启清零 | Prometheus 指标 + 告警 + 链路追踪 | metrics.ts 换 prom-client |
+| 部署 | Docker 多阶段 + compose（app+pgvector） | K8s/托管服务 + 镜像仓库 + CI 构建 | Todo5-5 CI/CD |
+| 前端 | 单页 React，无状态管理库 | 组件库/状态管理/构建产物 CDN 化 | 按需 |
+| 坑 | ① SSE 误用 `req.on("close")`——POST body 读完即触发，agentLoop 起步就移除 listener 丢日志 ② SPA 回退吞掉 API 404 ③ 启发式 `:id` 归并把 "sessions" 误判成动态段 ④ chat 走云 + embedding 走本地时 baseURL 必须分离（LM Studio 无云端 embedding 模型 → 404） | — | 全部已修复并实测 |
+
+---
+
 ## 待补区块（后续阶段）
 
 - 阶段 3：任务规划 + 多 Agent 编排（手写状态机 vs LangGraph）

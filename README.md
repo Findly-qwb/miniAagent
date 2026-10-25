@@ -17,7 +17,7 @@
 
 ## 技术栈
 
-TypeScript 5 · Node.js 20+ · OpenAI SDK v4 · tsx(零配置运行) · PostgreSQL 17 + pgvector 0.8
+TypeScript 5 · Node.js 20+ · OpenAI SDK v4 · tsx(零配置运行) · PostgreSQL 17 + pgvector 0.8 · Express 5(SSE) · React 18 + Vite · LangGraph · Docker
 
 ## 快速开始
 
@@ -176,13 +176,22 @@ ts-minimal-agent/
 │   │   └── langgraph-pipeline.ts # LangGraph 等价实现 runTaskLangGraph
 │   └── infra/            # 基础设施
 │       ├── config.ts     # .env 配置读取与校验
-│       ├── logger.ts     # 分级日志(INFO/WARN/ERROR)
+│       ├── logger.ts     # 分级日志(INFO/WARN/ERROR + SSE 事件总线)
 │       ├── usage.ts      # Token 统计打印与落盘
 │       ├── db.ts         # pg 连接池 + memories/knowledge 表初始化
-│       └── embedding.ts  # 文本→向量(embedText + 前缀对齐)
+│       ├── embedding.ts  # 文本→向量(embedText + 前缀对齐)
+│       └── metrics.ts    # 请求耗时/任务成功率监控
+│   └── server/           # Web 服务层(Todo4)
+│       ├── index.ts      # HTTP 入口(初始化数据层后监听)
+│       ├── app.ts        # Express 装配 + 静态托管 + 监控中间件
+│       └── routes/       # chat(SSE 对话) / knowledge(上传/列表)
+├── web/                  # React 控制台(Vite+TS)
+│   └── src/              # 对话/思考链路/上传/会话切换四组件
 ├── scripts/eval-rag.ts  # RAG 评测脚本(召回+幻觉统计)
 ├── docs/knowledge/      # 业务文档(md/txt 入库源,与项目文档隔离)
 ├── docs/                # 项目文档(mvp-vs-production 对照等)
+├── Dockerfile           # 多阶段构建(后端 tsc + 前端 vite → 生产镜像)
+├── docker-compose.yml   # app + pgvector 一键编排
 ├── .env.example    # 环境变量模板(提交)
 ├── .env            # 本地密钥(不提交)
 ├── logs/           # Token 消耗日志(不提交)
@@ -192,11 +201,50 @@ ts-minimal-agent/
 ## 开发命令
 
 ```bash
-npm run dev        # tsx 直接运行
+npm run dev        # tsx 直接运行(演示用例:会话隔离/压缩/记忆/规划全流程)
+npm run server     # 启动 HTTP 服务(开发模式,tsx)
 npm run typecheck  # tsc --noEmit 类型检查
-npm run build      # 编译到 dist/
+npm run build      # 编译后端到 dist/
 npm run eval       # RAG 评测(召回 + 回答幻觉统计)
+cd web && npm install && npm run dev   # 前端控制台(默认 5173,/api 代理到 3000)
 ```
+
+## 部署
+
+### Docker 一键启动(推荐)
+
+前置:Docker Desktop(Windows 需在 BIOS 开启虚拟化 SVM/VT-x)。
+
+```bash
+# 1. 准备环境变量(至少填 OPENAI_API_KEY 与 PG_PASSWORD)
+cp .env.example .env
+
+# 2. 构建并启动 app + pgvector 双服务
+docker compose up -d --build
+
+# 3. 访问
+# 前端 + API 同端口:http://localhost:3000
+# 监控快照:http://localhost:3000/api/metrics
+```
+
+compose 要点:
+- `postgres` 用 `pgvector/pgvector:pg17` 镜像,自带向量扩展;`pg_isready` 健康检查通过后才启动 app
+- `pgdata` 命名卷持久化数据库;`./docs/knowledge` 挂载,上传的文档不随容器重建丢失
+- 容器内 `PG_HOST=postgres` 走服务名解析;`EMBEDDING_BASE_URL=host.docker.internal:1234` 回连宿主机 LM Studio
+- 聊天模型走云端(OPENAI_BASE_URL),embedding 走本地——两者端点独立配置
+
+### 本地生产模式(无 Docker)
+
+```bash
+npm run build && npm --prefix web run build   # 编译后端 + 打包前端
+node dist/server/index.js                     # 单端口 3000 同时托管前端与 API
+```
+
+要求本机已运行:PostgreSQL(带 pgvector)、LM Studio(加载 nomic embedding 模型)。
+
+### 监控
+
+`GET /api/metrics` 返回:各路由请求数/错误数/平均与最大耗时、任务成功率(success/stopped/failed 三分类)。服务每 5 分钟向日志打一条快照。
 
 ## 路线图
 
@@ -204,4 +252,4 @@ npm run eval       # RAG 评测(召回 + 回答幻觉统计)
 - [x] 向量记忆(pgvector):save_memory / search_memory + 自动注入
 - [x] RAG 知识库工具(分块入库 + 检索 + 评测)
 - [x] 多 Agent 编排(手写状态机 + LangGraph 重写)
-- [ ] Web 控制台(Express + React)
+- [x] Web 控制台(Express + React + SSE 思考链路 + Docker 编排)

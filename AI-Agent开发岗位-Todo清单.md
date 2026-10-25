@@ -83,11 +83,11 @@
 - [x] Todo4-2：React 前端页面开发：对话输入框、展示 Agent 思考链路与工具调用日志、知识库文档上传入口、会话切换—— ✅ 已完成：`web/`（Vite+React18+TS，四组件 SessionSidebar/ChatPanel/LogStream/KnowledgePanel）；`streamChat` 手写 SSE 解析（fetch+ReadableStream，因 EventSource 不支持 POST）；对话输入/思考链路实时渲染（按级别着色，MEMORY 降级显红）/文档上传/会话切换+localStorage 记忆当前会话；**修复重大 bug**：SSE 只推前 2 条日志——根因是误用 `req.on("close")`（POST body 读完即触发，在 agentLoop 起步时就移除 listener），改 `res.on("close")`；用 ALS 隔离诊断脚本排除了"AsyncLocalStorage 丢失"的错误假设，靠服务端 SSE-DIAG 探针锁定真凶；浏览器实测 11 条链路日志完整渲染
 - [x] Todo4-3：前后端联调，浏览器端完整跑通对话、知识库上传—— ✅ 已完成：浏览器端到端实测全通——① 对话：SSE 思考链路 14 条日志实时渲染（含 MEMORY 注入成功、TOOL 调用链、RAG 命中、TOKEN）；② 上传：`tmp-upload-doc.md` 经 UI 选择→读取→POST→入库（右栏列表 + 状态双确认）；③ **检索闭环**：提问刚上传文档的暗号/工号，模型自主连调 `search_knowledge_base`×2 + `search_memory`×1，答「紫罗兰-7788 / A1024」全部来自新文档零幻觉；测试数据已清理
 - [x] Todo4-4：Docker 打包整个项目（后端 + 数据库），编写 Dockerfile、docker-compose.yml—— ✅ 已完成：`Dockerfile`（多阶段：node:20-alpine 构建后端 tsc + 前端 vite → 运行阶段仅 `npm ci --omit=dev` 生产依赖，拷贝 dist/web/dist/docs）；`docker-compose.yml`（app + postgres 双服务，`pgvector/pgvector:pg17` 镜像带向量扩展、`pg_isready` 健康检查、`depends_on: service_healthy` 保证 PG 就绪再起 app、pgdata 持久卷、`host.docker.internal` 让容器访问宿主机 LM Studio 做 embedding、docs/knowledge 挂载卷）；`app.ts` 增加 `web/dist` 存在时同端口静态托管 + SPA 回退（Express 5 `{*path}` 语法）实现单容器部署；`.dockerignore` 排除依赖/产物/.env；**本地等价验证**（无 Docker 环境下跑生产模式 `node dist/server/index.js`）：GET / 返回前端、/api/health 正常、SPA 回退 200、静态资源 200、浏览器在 3000 端口对话成功
-- [ ] Todo4-5：本地容器化部署，验证一键启动
+- [~] Todo4-5：本地容器化部署，验证一键启动—— ⏸ **环境受限跳过**（本机 BIOS 未开虚拟化 SVM，用户决定不启用 Docker）：Dockerfile/compose 交付物已在 4-4 完成并提交，且已用「本地生产模式」（`node dist/server/index.js` 单端口托管前端+API）做了等价验证：GET / 前端、/api/health、SPA 回退、静态资源、浏览器对话全通过；将来任何有 Docker 环境的机器可直接 `docker compose up -d --build` 一键启动
 - [x] Todo4-6：增加基础监控：记录每次请求耗时、任务成功率—— ✅ 已完成：`src/infra/metrics.ts`（内存计数器：路由级 count/errors/avgMs/maxMs + 任务三分类 success/stopped/failed + 成功率 + 5 分钟周期快照日志）；`app.ts` 中间件 `res.on("finish")` 记耗时、`GET /api/metrics` 暴露快照；`chat.ts` 按 agentLoop 哨兵返回值打点。实测：`/api/chat` avgMs=8931（对话真实耗时）、`/api/sessions` 归并正确。**修两个实测暴露的 bug**：① 启发式 `:id` 归并把 "sessions" 误判成动态段 → 改用 Express 路由模板 `req.route.path`；② SPA 回退把 `/api/no-such-route` 吞成 200 HTML → API 前缀未知路由改回 404 JSON
-- [ ] Todo4-7：完善 README 部署文档，提交代码
+- [x] Todo4-7：完善 README 部署文档，提交代码—— ✅ 已完成：README 新增「部署」章节（Docker 一键启动步骤 + compose 要点：pgvector 镜像/健康检查/卷挂载/host.docker.internal；本地生产模式无 Docker 跑法；监控端点说明），目录结构补 server/web/metrics/Dockerfile，技术栈补 Express5/React18/Vite/LangGraph/Docker，开发命令补 server/web，路线图勾选 Web 控制台；阶段 4 收尾同步更新 `docs/mvp-vs-production.md`（会话持久化/SSE 断线重连/长任务异步/鉴权/监控指标化 6 维对照 + 4 坑速查）；代码已提交
 
-✅ **阶段 4 交付物**：可浏览器访问的 Web Agent 应用，支持文档上传、对话、查看 Agent 思考链路。
+✅ **阶段 4 交付物（已完成）**：可浏览器访问的 Web Agent 应用，支持文档上传、对话、查看 Agent 思考链路；本地生产模式单端口托管已实测，Docker 编排文件就绪（本机未启用 Docker，标注环境受限）。
 
 ---
 
@@ -141,6 +141,9 @@
 - ✅ **Todo4-3 已完成**：浏览器端到端全通——对话 SSE 14 条日志渲染、文档上传入库、提问检索刚上传内容零幻觉（紫罗兰-7788/A1024）
 - ✅ **Todo4-4 已完成**：Docker 多阶段构建 + compose（app+pgvector 双服务健康检查编排）+ 单端口静态托管；无 Docker 环境以生产模式本地等价验证通过
 - ✅ **Todo4-6 已完成**：请求耗时/任务成功率监控（路由模板归并 + API 404 修复，实测 /api/chat avg 8.9s）
-- **进行中 / 下一步**：Todo4-5（本地容器化部署验证一键启动，Docker 就绪后执行）
+- ✅ **Todo4-7 已完成**：README 部署章节（Docker + 本地生产模式双路径）+ 目录/技术栈/命令/路线图更新，mvp-vs-production 阶段 4 对照
+- ⏸ **Todo4-5 环境受限跳过**：本机未开 BIOS 虚拟化，用户决定不用 Docker 部署；compose 交付物已就绪，本地生产模式已做等价验证
+- ✅ **阶段 4 完成（6/7，4-5 环境受限）**：HTTP 接口 → React 控制台 → 端到端联调 → Docker 打包 → 监控 → 部署文档
+- **进行中 / 下一步**：阶段 5 加分项（选做 1~2 个）——Todo5-4（Agent 批量评测：成功率/幻觉率/token 成本）最贴合已建的 eval-rag 体系，推荐优先
 - ⚠️ 风险项：密钥曾明文出现在 `agent.ts` 源码（历史提交无泄漏，已移至 `.env`），建议尽快轮换曾暴露的 Key
-- 总进度：阶段 0 完成 9/9，阶段 1 完成 8/8，阶段 2 完成 8/8，阶段 3 完成 8/8，阶段 4 完成 5/7（4-5 待验证、4-7 未做）
+- 总进度：阶段 0 完成 9/9，阶段 1 完成 8/8，阶段 2 完成 8/8，阶段 3 完成 8/8，阶段 4 完成 6/7（4-5 环境受限）
