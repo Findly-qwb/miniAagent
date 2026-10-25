@@ -12,7 +12,8 @@
     "start": "node dist/server/index.js",
     "build": "tsc",
     "typecheck": "tsc --noEmit",
-    "eval": "tsx scripts/eval-rag.ts"
+    "eval": "tsx scripts/eval-rag.ts",
+    "eval:agent": "tsx scripts/eval-agent.ts"
   },
   "keywords": [
     "openai",
