@@ -39,7 +39,8 @@ const main = async (): Promise<void> => {
     const c = cases[i];
     // 召回：检索 Top3 是否包含含 gold 关键词的片段
     const k = await searchKnowledgeBase(c.question, 3);
-    const hits = k.ok ? (JSON.parse(k.data) as { content: string; similarity: number }[]) : [];
+    const parsed = k.ok ? (JSON.parse(k.data) as { chunks: { content: string; similarity: number }[] }) : { chunks: [] };
+    const hits = parsed.chunks ?? [];
     const top1Sim = hits[0]?.similarity ?? 0;
     const goldInTop3 = hits.some((h) => c.goldKeywords.some((kw) => h.content.includes(kw)));
     if (hits[0] && c.goldKeywords.some((kw) => hits[0]!.content.includes(kw))) recallTop1++;

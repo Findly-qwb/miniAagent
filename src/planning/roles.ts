@@ -112,7 +112,7 @@ export const reviewerAgent = async (
         messages,
         temperature: 0.1,
         response_format: REVIEW_SCHEMA,
-        max_tokens: 1000,
+        max_tokens: 4000, // 推理模型思考吃 token，预算过小会 finish=length 空输出
       });
       const v = extractJson(resp.choices[0]?.message?.content ?? "");
       if (v) return normalizeVerdict(v);

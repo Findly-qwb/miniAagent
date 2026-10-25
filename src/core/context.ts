@@ -45,7 +45,7 @@ const summarizeOldMessages = async (oldMessages: ChatMessage[]): Promise<string 
           content: `请用不超过120字的中文总结以下对话要点，保留人名、关键事实、数字与结论：\n\n${transcript}`,
         },
       ],
-      max_tokens: 300,
+      max_tokens: 2000, // 推理模型思考吃 token，300 预算会 finish=length 空输出
     });
     const summary = resp.choices[0]?.message?.content?.trim();
     return summary || null;

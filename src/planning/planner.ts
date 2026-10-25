@@ -92,9 +92,10 @@ export const planTask = async (task: string, maxSubtasks = 6): Promise<TaskPlan>
       { role: "user", content: task },
     ],
     temperature: 0.2,
-    // 约束解码强制合法 JSON；max_tokens 防长拆解截断
+    // 约束解码强制合法 JSON；预算给足——推理型模型（step-5-preview）思考 token 也计入，
+    // 1500 实测被截断致解析失败（Todo5-3 回归踩坑）
     response_format: PLAN_SCHEMA,
-    max_tokens: 1500,
+    max_tokens: 6000,
   });
 
   const usage = resp.usage;
