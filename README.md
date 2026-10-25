@@ -16,6 +16,7 @@
 - **上下文窗口管理**:token 估算 + 超限自动摘要压缩,旧消息不丢关键事实
 - **可评测**:`npm run eval` 量化召回质量与回答幻觉,`npm run eval:agent` 批量评测 5 类能力(成功率/幻觉率/token 成本)
 - **MCP 协议**:工具注册表支持运行期接入外部 MCP 服务器,模型自动发现并调用新工具
+- **Graph RAG**:LLM 抽取实体/关系建知识图谱,检索时向量(语义)+ 图谱(关系链路)混合增强
 - **密钥安全**:所有配置走 `.env`(`dotenv`),绝不硬编码
 
 ## 技术栈
@@ -172,7 +173,8 @@ ts-minimal-agent/
 │   ├── rag/              # RAG 知识库层
 │   │   ├── loader.ts     # 文档加载(.md/.txt,递归目录)
 │   │   ├── chunker.ts    # 分块(300字窗口+50重叠)
-│   │   └── knowledge.ts  # 入库/检索(knowledge_chunks 表 + 余弦 Top-K)
+│   │   ├── graph.ts      # Graph RAG:LLM 抽取实体/关系 + 一跳扩展检索
+│   │   └── knowledge.ts  # 入库/检索(knowledge_chunks 表 + 余弦 Top-K + 图谱混合)
 │   ├── planning/         # 任务规划与多 Agent 编排层
 │   │   ├── planner.ts    # planTask:LLM 拆解子任务(json_schema 约束解码)
 │   │   ├── roles.ts      # Planner/Executor/Reviewer/Synthesizer 四角色(人设+工具白名单)

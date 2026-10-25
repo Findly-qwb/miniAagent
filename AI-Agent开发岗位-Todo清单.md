@@ -96,7 +96,7 @@
 
 - [x] Todo5-1：MCP：改造工具调用，对接 MCP 服务，理解 Model Context Protocol—— ✅ 已完成：`src/mcp/server.ts`（独立 MCP 服务器，stdio 传输，暴露 word_stats/slugify 两工具；日志走 stderr 不污染协议通道）+ `src/mcp/client.ts`（握手→tools/list 发现→运行期注册→tools/call 转发；连接失败降级跳过）；工具层重构为 `src/tools/registry.ts`（本地编译期 + MCP 运行期统一登记，schema+执行器成对注册），agent 改为每次 `getToolDefs()` 现取（删掉编译期快照导出，否则运行期新工具不可见）；实测三段：注册 2 工具（表 7→9）、dispatch 直调返回 `{"chars":14,"words":3}`、**模型自主发现并调用 `mcp_text_word_stats`** 答出 9 词
 - [ ] Todo5-2：Ollama 本地部署 LLM，Agent 对接本地模型
-- [ ] Todo5-3：Graph RAG 改造知识库，构建知识图谱增强检索
+- [x] Todo5-3：Graph RAG 改造知识库，构建知识图谱增强检索—— ✅ 已完成：`src/rag/graph.ts`（`initGraphStore` 实体/关系两表幂等建表；`extractAndStoreGraph` 文档→LLM 抽取→入库，实体字符串/对象双形态归一；`searchGraph` 查询抽实体→双向模糊匹配→一跳邻居关系）；`knowledge.ts` 入库管道挂图谱抽取、检索返回 `{chunks, graph}` 混合结构（向量抓语义+图谱抓关系）；实测产品手册抽出 15 实体/14 关系，「华东银行和启明科技什么关系」图谱命中「启明智能客服系统-[面向]->银行」。⚠️ 踩坑：step-5-preview 对**嵌套对象数组** json_schema 约束解码不可靠（带 response_format 输出空/畸形，不带反而完美）→ 图谱改「提示词内联 schema + extractJson 容错」，并把 extractJson 升级为可补外层花括号；验证平面 schema（planTask）不受影响；RAG 评测回归 7/7
 - [x] Todo5-4：Agent 评测脚本：批量评测任务，统计成功率、幻觉率、token 成本—— ✅ 已完成：`scripts/eval-agent.ts`（`npm run eval:agent`）：8 用例覆盖 5 类能力（tool/memory/rag/plan/anti-hallucination），gold 关键词判分 + forbidden 关键词判幻觉 + `onUsage` 回调精确统计每用例 token；**评测当场抓出真 bug**：① 无关文档混入 docs/knowledge 污染检索（移出+清库）② 云端 429 限流下固定 3s 退避不足、重试烧光轮次预算 → 修 `agentLoop` 指数退避（8s 起、×2、上限 30s、最多 3 次、**退避重试不占轮次**）；修复后成功率 37.5% → **100%、幻觉率 0%**（含"月球基地收费"诱骗题正确拒答）
 - [x] Todo5-5：CI/CD 配置，代码提交自动运行简单测试—— ✅ 已完成：`.github/workflows/ci.yml`（push/PR 触发：npm ci 双缓存 → typecheck → 后端 tsc 构建 → 前端 vite 构建；评测脚本依赖云端 API/PG/LM Studio 不进 CI）；**首次推送 Actions 实测 conclusion=success**
 
@@ -147,6 +147,7 @@
 - ✅ **Todo5-4 已完成**：Agent 批量评测（8 用例 5 类能力，成功率 100%/幻觉 0%/平均 3414 tok）；评测抓出 429 退避不足与知识库污染两个真 bug 并修复
 - ✅ **Todo5-5 已完成**：GitHub Actions CI（typecheck + 前后端构建），首次推送实测 success
 - ✅ **Todo5-1 已完成**：MCP 服务器+客户端+注册表重构（运行期发现工具并入模型工具表），模型自主调用实测通过
-- **进行中 / 下一步**：阶段 5 剩余——Todo5-3（Graph RAG，工作量最大）或收官润色；Todo5-2（Ollama）与 LM Studio 重复度高不推荐
+- ✅ **Todo5-3 已完成**：Graph RAG——实体/关系图谱入库 + 一跳扩展混合检索（15 实体/14 关系实测）；踩坑：step-5 嵌套 json_schema 不可靠，改提示词内联 schema + 容错解析
+- **进行中 / 下一步**：阶段 5 仅剩 Todo5-2（Ollama，与 LM Studio 重复度高，建议跳过）；主线全部完成，项目可收官
 - ⚠️ 风险项：密钥曾明文出现在 `agent.ts` 源码（历史提交无泄漏，已移至 `.env`），建议尽快轮换曾暴露的 Key
-- 总进度：阶段 0~4 全部完成（9+8+8+8+6），阶段 5 进行 3/5
+- 总进度：阶段 0~4 全部完成（9+8+8+8+6），阶段 5 完成 4/5（5-2 建议跳过）

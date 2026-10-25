@@ -34,17 +34,27 @@ const PLAN_SCHEMA = {
   },
 } as const;
 
-// 从模型输出中提取 JSON：容忍 ```json 围栏与前后废话，取首个 { 到末个 }
+// 从模型输出中提取 JSON：容忍 ```json 围栏与前后废话，取首个 { 到末个 }；
+// 部分模型（实测 step-5-preview）不遵守 json_schema 时会漏掉外层花括号，
+// 输出 `"k":v,...` 形式的对象体——解析失败则自动补 {} 重试
 export const extractJson = (raw: string): Record<string, unknown> | null => {
   const cleaned = raw.replace(/```json/gi, "").replace(/```/g, "").trim();
+  const tryParse = (s: string): Record<string, unknown> | null => {
+    try {
+      const v = JSON.parse(s);
+      return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
+    } catch {
+      return null;
+    }
+  };
   const start = cleaned.indexOf("{");
   const end = cleaned.lastIndexOf("}");
-  if (start === -1 || end <= start) return null;
-  try {
-    return JSON.parse(cleaned.slice(start, end + 1)) as Record<string, unknown>;
-  } catch {
-    return null;
+  if (start !== -1 && end > start) {
+    const direct = tryParse(cleaned.slice(start, end + 1));
+    if (direct) return direct;
   }
+  // 兜底：缺外层花括号的对象体
+  return tryParse(`{${cleaned}}`);
 };
 
 // 规整模型返回：缺字段补默认、丢 title 的条目剔除、总量截断

@@ -4,6 +4,7 @@ import { embedText, toVectorLiteral } from "../infra/embedding.js";
 import { logger } from "../infra/logger.js";
 import { loadFile, loadDirectory, type LoadedDoc } from "./loader.js";
 import { chunkText } from "./chunker.js";
+import { extractAndStoreGraph, searchGraph, initGraphStore } from "./graph.js";
 import type { ToolCallResult } from "../types.js";
 
 // 知识库检索命中块
@@ -35,6 +36,7 @@ export const initKnowledgeStore = async (): Promise<void> => {
   `);
   const { rows } = await pool.query(`SELECT count(*)::int AS n FROM knowledge_chunks`);
   logger.info("DB", `知识库就绪：knowledge_chunks 现有 ${rows[0].n} 个分块`);
+  await initGraphStore(); // Todo5-3：图谱表随知识库一起就绪
 };
 
 // 单个文档入库：全文分块 → 逐块 embedding → 批量插入；同名 doc_id 先清旧数据（幂等重灌）
@@ -54,6 +56,7 @@ export const ingestDocument = async (filePath: string): Promise<ToolCallResult> 
       );
     }
     logger.info("RAG", `文档入库 ${doc.name}：${chunks.length} 个分块（doc_id=${doc.docId}）`);
+    await extractAndStoreGraph(doc.docId, doc.content); // Todo5-3：同步抽取知识图谱（失败降级）
     return { ok: true, data: `文档已入库：${doc.name}，共 ${chunks.length} 个分块` };
   } catch (err) {
     logger.error("RAG", "文档入库失败", err);
@@ -80,6 +83,7 @@ export const ingestDirectory = async (dirPath: string): Promise<ToolCallResult> 
         total++;
       }
       logger.info("RAG", `文档入库 ${doc.name}：${chunks.length} 个分块`);
+      await extractAndStoreGraph(doc.docId, doc.content); // Todo5-3：同步抽取知识图谱（失败降级）
     }
     return { ok: true, data: `知识库入库完成：${docs.length} 个文档，${total} 个分块` };
   } catch (err) {
@@ -111,7 +115,9 @@ export const searchKnowledgeBase = async (query: string, topK = 3): Promise<Tool
     } else {
       logger.info("RAG", `知识库检索「${query.slice(0, 30)}」命中 ${hits.length} 条（Top1 相似度 ${hits[0].similarity}）`);
     }
-    return { ok: true, data: JSON.stringify(hits) };
+    // Todo5-3：图谱扩展——命中实体的一跳关系链路随向量结果一并返回（向量抓语义、图谱抓关系）
+    const graph = await searchGraph(query);
+    return { ok: true, data: JSON.stringify({ chunks: hits, graph }) };
   } catch (err) {
     logger.error("RAG", "知识库检索失败", err);
     return { ok: false, error: `知识库检索失败: ${String(err)}` };
