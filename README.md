@@ -1,5 +1,7 @@
 # ts-minimal-agent
 
+[![CI](https://github.com/Findly-qwb/miniAagent/actions/workflows/ci.yml/badge.svg)](https://github.com/Findly-qwb/miniAagent/actions/workflows/ci.yml)
+
 手写原生 **ReAct Agent**(TypeScript + Node.js)——不依赖任何 Agent 框架,基于 OpenAI Function Calling 协议从零实现的工具调用循环。
 
 ## 项目亮点
@@ -12,7 +14,7 @@
 - **记忆分层**:会话(工作记忆)+ pgvector 长期记忆(语义向量),跨会话持久
 - **RAG 知识库**:文档入库分块 + 向量检索,Agent 自主检索业务资料作答
 - **上下文窗口管理**:token 估算 + 超限自动摘要压缩,旧消息不丢关键事实
-- **可评测**:`npm run eval` 量化召回质量与回答幻觉(定位瓶颈在哪层)
+- **可评测**:`npm run eval` 量化召回质量与回答幻觉,`npm run eval:agent` 批量评测 5 类能力(成功率/幻觉率/token 成本)
 - **密钥安全**:所有配置走 `.env`(`dotenv`),绝不硬编码
 
 ## 技术栈
@@ -207,6 +209,7 @@ npm run server     # 仅启动 HTTP 服务(开发模式,tsx)
 npm run typecheck  # tsc --noEmit 类型检查
 npm run build      # 编译后端到 dist/
 npm run eval       # RAG 评测(召回 + 回答幻觉统计)
+npm run eval:agent # Agent 批量评测(成功率 / 幻觉率 / token 成本)
 npm run web:dev    # 仅前端控制台(5173,/api 代理到 3000)
 npm run web:build  # 前端打包到 web/dist
 ```
