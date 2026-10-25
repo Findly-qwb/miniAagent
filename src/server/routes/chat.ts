@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { agentLoop } from "../../core/agent.js";
 import { listSessions, getSession, clearSession } from "../../core/session.js";
 import { logEmitter, requestContext, type LogEvent } from "../../infra/logger.js";
+import { recordTask } from "../../infra/metrics.js";
 
 // Todo4-1：对话与会话管理接口
 export const chatRouter = Router();
@@ -56,8 +57,13 @@ chatRouter.post("/chat", (req, res) => {
   void requestContext.run({ reqId }, async () => {
     try {
       const answer = await agentLoop(sessionId, message);
+      // Todo4-6：任务结果分类（agentLoop 的哨兵返回值区分成功/达轮次上限/异常终止）
+      if (answer.startsWith("[已停止]")) recordTask("stopped");
+      else if (answer.startsWith("[异常]")) recordTask("failed");
+      else recordTask("success");
       send("result", { answer });
     } catch (err) {
+      recordTask("failed");
       send("error", { error: String(err) });
     } finally {
       send("done", {});

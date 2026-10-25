@@ -84,7 +84,7 @@
 - [x] Todo4-3：前后端联调，浏览器端完整跑通对话、知识库上传—— ✅ 已完成：浏览器端到端实测全通——① 对话：SSE 思考链路 14 条日志实时渲染（含 MEMORY 注入成功、TOOL 调用链、RAG 命中、TOKEN）；② 上传：`tmp-upload-doc.md` 经 UI 选择→读取→POST→入库（右栏列表 + 状态双确认）；③ **检索闭环**：提问刚上传文档的暗号/工号，模型自主连调 `search_knowledge_base`×2 + `search_memory`×1，答「紫罗兰-7788 / A1024」全部来自新文档零幻觉；测试数据已清理
 - [x] Todo4-4：Docker 打包整个项目（后端 + 数据库），编写 Dockerfile、docker-compose.yml—— ✅ 已完成：`Dockerfile`（多阶段：node:20-alpine 构建后端 tsc + 前端 vite → 运行阶段仅 `npm ci --omit=dev` 生产依赖，拷贝 dist/web/dist/docs）；`docker-compose.yml`（app + postgres 双服务，`pgvector/pgvector:pg17` 镜像带向量扩展、`pg_isready` 健康检查、`depends_on: service_healthy` 保证 PG 就绪再起 app、pgdata 持久卷、`host.docker.internal` 让容器访问宿主机 LM Studio 做 embedding、docs/knowledge 挂载卷）；`app.ts` 增加 `web/dist` 存在时同端口静态托管 + SPA 回退（Express 5 `{*path}` 语法）实现单容器部署；`.dockerignore` 排除依赖/产物/.env；**本地等价验证**（无 Docker 环境下跑生产模式 `node dist/server/index.js`）：GET / 返回前端、/api/health 正常、SPA 回退 200、静态资源 200、浏览器在 3000 端口对话成功
 - [ ] Todo4-5：本地容器化部署，验证一键启动
-- [ ] Todo4-6：增加基础监控：记录每次请求耗时、任务成功率
+- [x] Todo4-6：增加基础监控：记录每次请求耗时、任务成功率—— ✅ 已完成：`src/infra/metrics.ts`（内存计数器：路由级 count/errors/avgMs/maxMs + 任务三分类 success/stopped/failed + 成功率 + 5 分钟周期快照日志）；`app.ts` 中间件 `res.on("finish")` 记耗时、`GET /api/metrics` 暴露快照；`chat.ts` 按 agentLoop 哨兵返回值打点。实测：`/api/chat` avgMs=8931（对话真实耗时）、`/api/sessions` 归并正确。**修两个实测暴露的 bug**：① 启发式 `:id` 归并把 "sessions" 误判成动态段 → 改用 Express 路由模板 `req.route.path`；② SPA 回退把 `/api/no-such-route` 吞成 200 HTML → API 前缀未知路由改回 404 JSON
 - [ ] Todo4-7：完善 README 部署文档，提交代码
 
 ✅ **阶段 4 交付物**：可浏览器访问的 Web Agent 应用，支持文档上传、对话、查看 Agent 思考链路。
@@ -140,6 +140,7 @@
 - ✅ **Todo4-2 已完成**：React 控制台（web/，Vite+TS）四组件 + SSE 手写解析；修复 req.on("close") 误用导致的日志丢失 bug；浏览器实测链路日志完整渲染
 - ✅ **Todo4-3 已完成**：浏览器端到端全通——对话 SSE 14 条日志渲染、文档上传入库、提问检索刚上传内容零幻觉（紫罗兰-7788/A1024）
 - ✅ **Todo4-4 已完成**：Docker 多阶段构建 + compose（app+pgvector 双服务健康检查编排）+ 单端口静态托管；无 Docker 环境以生产模式本地等价验证通过
-- **进行中 / 下一步**：Todo4-5（本地容器化部署，验证一键启动——需 Docker，本机未安装）
+- ✅ **Todo4-6 已完成**：请求耗时/任务成功率监控（路由模板归并 + API 404 修复，实测 /api/chat avg 8.9s）
+- **进行中 / 下一步**：Todo4-5（本地容器化部署验证一键启动，Docker 就绪后执行）
 - ⚠️ 风险项：密钥曾明文出现在 `agent.ts` 源码（历史提交无泄漏，已移至 `.env`），建议尽快轮换曾暴露的 Key
-- 总进度：阶段 0 完成 9/9，阶段 1 完成 8/8，阶段 2 完成 8/8，阶段 3 完成 8/8，阶段 4 进行 4/7
+- 总进度：阶段 0 完成 9/9，阶段 1 完成 8/8，阶段 2 完成 8/8，阶段 3 完成 8/8，阶段 4 完成 5/7（4-5 待验证、4-7 未做）
