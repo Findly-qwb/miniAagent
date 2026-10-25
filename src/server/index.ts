@@ -3,6 +3,7 @@ import { logger } from "../infra/logger.js";
 import { initMemoryStore } from "../infra/db.js";
 import { initKnowledgeStore, ingestDirectory } from "../rag/knowledge.js";
 import { startMetricsReporter } from "../infra/metrics.js";
+import { connectMcpServer, selfMcpSpec } from "../mcp/client.js";
 
 // Todo4-1：HTTP 服务入口——先备好数据层再监听，启动即自检
 const PORT = Number(process.env.PORT ?? "3000");
@@ -12,6 +13,9 @@ const main = async (): Promise<void> => {
   await initKnowledgeStore();
   const ingest = await ingestDirectory("docs/knowledge");
   logger.info("SERVER", `知识库初始化：${ingest.ok ? ingest.data : ingest.error}`);
+
+  // Todo5-1：接入本地 MCP 工具服务器（失败降级：跳过，不影响主服务）
+  await connectMcpServer(selfMcpSpec("text", "server"));
 
   startMetricsReporter(); // Todo4-6：每 5 分钟打印监控快照
   createApp().listen(PORT, () => {

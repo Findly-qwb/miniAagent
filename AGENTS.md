@@ -20,8 +20,9 @@
 - `src/types.ts` — 全部类型定义（Tool / Message / ToolCallResult / TokenUsage），禁止 `any`
 - `src/core/` — Agent 核心：`agent.ts`（`agentLoop` 主循环）、`context.ts`（上下文窗口管理）、`session.ts`（会话隔离）
 - `src/llm/` — 模型层：`client.ts`（OpenAI 客户端单例）
-- `src/tools/` — 工具层：`index.ts`（工具注册表 + 执行器，统一返回 `ToolCallResult`）
+- `src/tools/` — 工具层：`registry.ts`（工具注册表：本地+MCP 统一登记）、`index.ts`（本地工具登记 + executeTool 分发）
 - `src/rag/` — RAG 层：`loader.ts`（文档加载）、`chunker.ts`（分块）、`knowledge.ts`（入库/检索）
+- `src/mcp/` — MCP 层：`server.ts`（stdio MCP 服务器）、`client.ts`（连接外部 MCP 服务器并运行期注册其工具）
 - `src/planning/` — 规划层：`planner.ts`（`planTask` LLM 拆解子任务，json_schema 约束）、`roles.ts`（Planner/Executor/Reviewer/Synthesizer 多角色）、`state-machine.ts`（`runTask` 状态机编排）
 - `src/infra/` — 基础设施：`config.ts`（`.env` 读取校验）、`logger.ts`（分级日志）、`usage.ts`（Token 统计落盘）
 - `.env` / `.env.example` — 配置（apiKey、baseURL、modelName、maxRound），密钥只存 `.env`

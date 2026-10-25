@@ -1,7 +1,8 @@
 import { openai } from "../llm/client.js";
 import { config } from "../infra/config.js";
 import { logger } from "../infra/logger.js";
-import { tools, executeTool, getToolsByNames } from "../tools/index.js";
+import { executeTool } from "../tools/index.js";
+import { getToolDefs, getToolDefsByNames } from "../tools/registry.js";
 import { retrieveRelevantMemory } from "../tools/memory.js";
 import { logTokenUsage, printUsageTotal } from "../infra/usage.js";
 import { getOrCreateSession } from "./session.js";
@@ -48,7 +49,7 @@ export async function agentLoop(
   const prefix: ChatMessage[] = [];
   if (opts.systemPrompt) prefix.push({ role: "system", content: opts.systemPrompt });
   if (memoryDigest) prefix.push({ role: "system", content: memoryDigest });
-  const roleTools = opts.toolNames ? getToolsByNames(opts.toolNames) : tools;
+  const roleTools = opts.toolNames ? getToolDefsByNames(opts.toolNames) : getToolDefs();
 
   // 累计 token 消耗
   let usageTotal: TokenUsage = { prompt: 0, completion: 0, total: 0 };

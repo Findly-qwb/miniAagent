@@ -3,6 +3,7 @@ import { initMemoryStore, pool } from "./infra/db.js";
 import { agentLoop } from "./core/agent.js";
 import { clearSession, getSession, listSessions } from "./core/session.js";
 import { initKnowledgeStore, ingestDirectory } from "./rag/knowledge.js";
+import { connectMcpServer, closeMcpClients, selfMcpSpec } from "./mcp/client.js";
 
 export { agentLoop } from "./core/agent.js";
 export { getOrCreateSession, getSession, listSessions, clearSession } from "./core/session.js";
@@ -57,13 +58,21 @@ const main = async (): Promise<void> => {
     "帮我写一份启明智能客服系统的产品一页纸介绍，必须包含产品定位、全部核心功能和三个版本的价格与坐席数，直接给我成品。"
   );
 
+  // Todo5-1 MCP 验证：运行期接入 MCP 工具服务器，模型应能发现并自主调用 mcp_text_* 工具
+  await connectMcpServer(selfMcpSpec("text", "server"));
+  await agentLoop(
+    "session-MCP",
+    "请用工具帮我统计这句话的单词数和字符数：\"the quick brown fox jumps over the lazy dog\""
+  );
+
   logger.info("SESSION", `当前会话列表: ${listSessions().join(", ")}`);
   const a = getSession("session-A");
   logger.info("SESSION", `session-A 消息数=${a?.messages.length ?? 0}（应 >0）`);
   const c = getSession("session-C");
   logger.info("SESSION", `session-C 消息数=${c?.messages.length ?? 0}（压缩后应明显小于长文本原始条数）`);
 
-  // 释放 pg 连接池，否则进程不会退出
+  // 释放 MCP 子进程与 pg 连接池，否则进程不会退出
+  await closeMcpClients();
   await pool.end();
 };
 

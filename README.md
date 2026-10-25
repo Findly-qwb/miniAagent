@@ -15,6 +15,7 @@
 - **RAG 知识库**:文档入库分块 + 向量检索,Agent 自主检索业务资料作答
 - **上下文窗口管理**:token 估算 + 超限自动摘要压缩,旧消息不丢关键事实
 - **可评测**:`npm run eval` 量化召回质量与回答幻觉,`npm run eval:agent` 批量评测 5 类能力(成功率/幻觉率/token 成本)
+- **MCP 协议**:工具注册表支持运行期接入外部 MCP 服务器,模型自动发现并调用新工具
 - **密钥安全**:所有配置走 `.env`(`dotenv`),绝不硬编码
 
 ## 技术栈
@@ -165,7 +166,8 @@ ts-minimal-agent/
 │   ├── llm/              # 模型层
 │   │   └── client.ts     # OpenAI 客户端单例
 │   ├── tools/            # 工具层
-│   │   ├── index.ts      # 工具注册表 + 执行器(统一 ToolCallResult)
+│   │   ├── registry.ts   # 工具注册表(本地编译期 + MCP 运行期统一登记)
+│   │   ├── index.ts      # 本地工具登记 + executeTool 分发
 │   │   └── memory.ts     # saveMemory/searchMemory/retrieveRelevantMemory
 │   ├── rag/              # RAG 知识库层
 │   │   ├── loader.ts     # 文档加载(.md/.txt,递归目录)
@@ -176,6 +178,9 @@ ts-minimal-agent/
 │   │   ├── roles.ts      # Planner/Executor/Reviewer/Synthesizer 四角色(人设+工具白名单)
 │   │   ├── state-machine.ts     # 手写状态机 runTask(规划→执行→校验→交付)
 │   │   └── langgraph-pipeline.ts # LangGraph 等价实现 runTaskLangGraph
+│   ├── mcp/              # MCP 协议层(Todo5-1)
+│   │   ├── server.ts     # stdio MCP 服务器(暴露 word_stats/slugify)
+│   │   └── client.ts     # 连接外部 MCP 服务器,运行期注册其工具
 │   └── infra/            # 基础设施
 │       ├── config.ts     # .env 配置读取与校验
 │       ├── logger.ts     # 分级日志(INFO/WARN/ERROR + SSE 事件总线)

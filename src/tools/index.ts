@@ -1,11 +1,13 @@
+import { registerTool, getToolDefs, getToolDefsByNames, dispatchTool } from "./registry.js";
 import { saveMemory, searchMemory } from "./memory.js";
 import { searchKnowledgeBase } from "../rag/knowledge.js";
 import { planTask } from "../planning/planner.js";
 import { logger } from "../infra/logger.js";
-import type { ToolArgs, ToolDefinition, ToolCallResult } from "../types.js";
+import type { ToolArgs, ToolCallResult } from "../types.js";
 
-// 工具定义（注册表）：新增工具在此追加 schema
-export const tools: ToolDefinition[] = [
+// ========== 本地工具登记（Todo5-1 起统一走 registry，MCP 工具运行期并入同一张表） ==========
+
+registerTool(
   {
     type: "function",
     function: {
@@ -14,6 +16,10 @@ export const tools: ToolDefinition[] = [
       parameters: { type: "object", properties: {}, required: [] },
     },
   },
+  async (): Promise<ToolCallResult> => ({ ok: true, data: new Date().toLocaleString() })
+);
+
+registerTool(
   {
     type: "function",
     function: {
@@ -29,7 +35,18 @@ export const tools: ToolDefinition[] = [
       },
     },
   },
-  // Todo1-5：长期记忆工具（pgvector 向量库，见 src/tools/memory.ts）
+  async (args: ToolArgs): Promise<ToolCallResult> => {
+    const a = Number(args.a);
+    const b = Number(args.b);
+    if (Number.isNaN(a) || Number.isNaN(b)) {
+      return { ok: false, error: `入参必须为数字，实际收到 a=${args.a}, b=${args.b}` };
+    }
+    return { ok: true, data: `${a} + ${b} = ${a + b}` };
+  }
+);
+
+// Todo1-5：长期记忆工具（pgvector 向量库，见 src/tools/memory.ts）
+registerTool(
   {
     type: "function",
     function: {
@@ -45,6 +62,14 @@ export const tools: ToolDefinition[] = [
       },
     },
   },
+  async (args: ToolArgs, ctx): Promise<ToolCallResult> => {
+    const content = String(args.content ?? "").trim();
+    if (!content) return { ok: false, error: "参数 content 不能为空" };
+    return saveMemory(ctx.sessionId, content);
+  }
+);
+
+registerTool(
   {
     type: "function",
     function: {
@@ -61,7 +86,16 @@ export const tools: ToolDefinition[] = [
       },
     },
   },
-  // Todo2-1：RAG 知识库工具（业务文档检索，见 src/rag/knowledge.ts）
+  async (args: ToolArgs): Promise<ToolCallResult> => {
+    const query = String(args.query ?? "").trim();
+    if (!query) return { ok: false, error: "参数 query 不能为空" };
+    const topK = args.top_k ? Number(args.top_k) : 5;
+    return searchMemory(query, Number.isNaN(topK) ? 5 : topK);
+  }
+);
+
+// Todo2-1：RAG 知识库工具（业务文档检索，见 src/rag/knowledge.ts）
+registerTool(
   {
     type: "function",
     function: {
@@ -78,7 +112,16 @@ export const tools: ToolDefinition[] = [
       },
     },
   },
-  // Todo3-1：任务规划工具（LLM 拆解子任务，见 src/planning/planner.ts）
+  async (args: ToolArgs): Promise<ToolCallResult> => {
+    const query = String(args.query ?? "").trim();
+    if (!query) return { ok: false, error: "参数 query 不能为空" };
+    const topK = args.top_k ? Number(args.top_k) : 3;
+    return searchKnowledgeBase(query, Number.isNaN(topK) ? 3 : topK);
+  }
+);
+
+// Todo3-1：任务规划工具（LLM 拆解子任务，见 src/planning/planner.ts）
+registerTool(
   {
     type: "function",
     function: {
@@ -95,7 +138,22 @@ export const tools: ToolDefinition[] = [
       },
     },
   },
-  // Todo3-4：多 Agent 流水线工具（规划→执行→校验→交付，见 src/planning/state-machine.ts）
+  async (args: ToolArgs): Promise<ToolCallResult> => {
+    const task = String(args.task ?? "").trim();
+    if (!task) return { ok: false, error: "参数 task 不能为空" };
+    const max = args.max_subtasks ? Number(args.max_subtasks) : 6;
+    try {
+      const plan = await planTask(task, Number.isNaN(max) || max < 1 ? 6 : max);
+      return { ok: true, data: JSON.stringify(plan) };
+    } catch (err) {
+      logger.error("TOOL", "plan_task 执行失败", err);
+      return { ok: false, error: `任务规划失败: ${String(err)}` };
+    }
+  }
+);
+
+// Todo3-4：多 Agent 流水线工具（规划→执行→校验→交付，见 src/planning/state-machine.ts）
+registerTool(
   {
     type: "function",
     function: {
@@ -111,92 +169,38 @@ export const tools: ToolDefinition[] = [
       },
     },
   },
-];
+  async (args: ToolArgs, ctx): Promise<ToolCallResult> => {
+    const task = String(args.task ?? "").trim();
+    if (!task) return { ok: false, error: "参数 task 不能为空" };
+    try {
+      // 动态 import 打破循环依赖：tools → state-machine → roles → agent → tools
+      const { runTask } = await import("../planning/state-machine.js");
+      const report = await runTask(task, ctx.sessionId);
+      logger.info("TOOL", `run_task 完成：终态=${report.state}，校验 ${report.reviewRounds} 轮，交付 ${report.finalAnswer.length} 字`);
+      return {
+        ok: true,
+        data: JSON.stringify({
+          state: report.state,
+          reviewRounds: report.reviewRounds,
+          subtasks: report.results.map((r) => ({ id: r.id, title: r.title })),
+          finalAnswer: report.finalAnswer,
+        }),
+      };
+    } catch (err) {
+      logger.error("TOOL", "run_task 执行失败", err);
+      return { ok: false, error: `多角色任务执行失败: ${String(err)}` };
+    }
+  }
+);
 
-// 按白名单取工具子集（Todo3-3：角色化——Executor 只给执行工具，Planner 不给工具等）
-export const getToolsByNames = (names: string[]): ToolDefinition[] =>
-  tools.filter((t) => names.includes(t.function.name));
+// 注意：不再导出编译期 tools 快照——MCP 工具是运行期注册的，
+// 消费方必须调 getToolDefs() 现取（agent.ts 已改），否则新工具不可见
+export { getToolDefs, getToolDefsByNames };
 
-// 工具执行器：统一返回 ToolCallResult 结构，成功/失败都序列化为字符串回传模型
+// 工具执行器：统一入口委托注册表分发（本地 + MCP 同一张表）
 // sessionId 用于 save_memory 落库时标记记忆来源会话（Todo1-5）
 export const executeTool = async (
   name: string,
   args: ToolArgs,
   sessionId = "default"
-): Promise<ToolCallResult> => {
-  switch (name) {
-    case "get_current_time":
-      return { ok: true, data: new Date().toLocaleString() };
-    case "add_numbers": {
-      const a = Number(args.a);
-      const b = Number(args.b);
-      if (Number.isNaN(a) || Number.isNaN(b)) {
-        return { ok: false, error: `入参必须为数字，实际收到 a=${args.a}, b=${args.b}` };
-      }
-      return { ok: true, data: `${a} + ${b} = ${a + b}` };
-    }
-    case "save_memory": {
-      const content = String(args.content ?? "").trim();
-      if (!content) {
-        return { ok: false, error: "参数 content 不能为空" };
-      }
-      return saveMemory(sessionId, content);
-    }
-    case "search_memory": {
-      const query = String(args.query ?? "").trim();
-      if (!query) {
-        return { ok: false, error: "参数 query 不能为空" };
-      }
-      const topK = args.top_k ? Number(args.top_k) : 5;
-      return searchMemory(query, Number.isNaN(topK) ? 5 : topK);
-    }
-    case "search_knowledge_base": {
-      const query = String(args.query ?? "").trim();
-      if (!query) {
-        return { ok: false, error: "参数 query 不能为空" };
-      }
-      const topK = args.top_k ? Number(args.top_k) : 3;
-      return searchKnowledgeBase(query, Number.isNaN(topK) ? 3 : topK);
-    }
-    case "plan_task": {
-      const task = String(args.task ?? "").trim();
-      if (!task) {
-        return { ok: false, error: "参数 task 不能为空" };
-      }
-      const max = args.max_subtasks ? Number(args.max_subtasks) : 6;
-      try {
-        const plan = await planTask(task, Number.isNaN(max) || max < 1 ? 6 : max);
-        return { ok: true, data: JSON.stringify(plan) };
-      } catch (err) {
-        logger.error("TOOL", "plan_task 执行失败", err);
-        return { ok: false, error: `任务规划失败: ${String(err)}` };
-      }
-    }
-    case "run_task": {
-      const task = String(args.task ?? "").trim();
-      if (!task) {
-        return { ok: false, error: "参数 task 不能为空" };
-      }
-      try {
-        // 动态 import 打破循环依赖：tools → state-machine → roles → agent → tools
-        const { runTask } = await import("../planning/state-machine.js");
-        const report = await runTask(task, sessionId);
-        logger.info("TOOL", `run_task 完成：终态=${report.state}，校验 ${report.reviewRounds} 轮，交付 ${report.finalAnswer.length} 字`);
-        return {
-          ok: true,
-          data: JSON.stringify({
-            state: report.state,
-            reviewRounds: report.reviewRounds,
-            subtasks: report.results.map((r) => ({ id: r.id, title: r.title })),
-            finalAnswer: report.finalAnswer,
-          }),
-        };
-      } catch (err) {
-        logger.error("TOOL", "run_task 执行失败", err);
-        return { ok: false, error: `多角色任务执行失败: ${String(err)}` };
-      }
-    }
-    default:
-      return { ok: false, error: `未知工具：${name}` };
-  }
-};
+): Promise<ToolCallResult> => dispatchTool(name, args, { sessionId });
